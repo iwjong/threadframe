@@ -1,0 +1,14 @@
+.env
+!.env.template
+*.env.local
+node_modules/
+*.pem
+*.key
+*.p12
+*.crt
+*.cer
+*.log
+*.out
+*.err
+.DS_Store
+docs/private/
