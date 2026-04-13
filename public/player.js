@@ -5,25 +5,32 @@
   const DURATION_MS = 7000;
   const CAPTION_DELAY_MS = 400;
   const PROGRESS_REVEAL_MS = 2500;
-  const SPLASH_SLIDE_DURATION_MS = 7000;
-  const SPLASH_SLIDE_COUNT = 3;
+  const FINAL_SPLASH_DURATION_MS = 1400;
   const COLOR_SAMPLE_SIZE = 48;
   const VIDEO_COLOR_UPDATE_INTERVAL_MS = 1500;
+  const LOADING_PROGRESS_MAX = 94;
+  const LOADING_PROGRESS_TICK_MS = 120;
   const DEFAULT_PANEL_BG = "#f5f2ed";
   const DEFAULT_PANEL_TEXT = "#2c2a26";
 
-  /* Fully random: pick one bg + one text independently for bold designer combinations */
+  /* Contrast-aware palette pool for varied but readable panel combinations */
   const BACKGROUNDS = [
     { hex: "#ffb6c1", name: "Pink" },
     { hex: "#ff69b4", name: "Hot Pink" },
     { hex: "#ffd700", name: "Gold" },
+    { hex: "#ffc857", name: "Marigold" },
     { hex: "#98fb98", name: "Mint" },
     { hex: "#e0ffff", name: "Cyan" },
+    { hex: "#d9eefc", name: "Mist" },
     { hex: "#dda0dd", name: "Plum" },
+    { hex: "#d7d2ff", name: "Lilac" },
     { hex: "#ff7f50", name: "Coral" },
     { hex: "#ffefd5", name: "Papaya" },
+    { hex: "#ffd8c2", name: "Apricot" },
     { hex: "#1a1a2e", name: "Navy" },
+    { hex: "#243b6b", name: "Harbor" },
     { hex: "#2d1b4e", name: "Violet" },
+    { hex: "#165b63", name: "Petrol" },
     { hex: "#fff8dc", name: "Cornsilk" },
     { hex: "#7fffd4", name: "Aquamarine" },
     { hex: "#ffe4b5", name: "Moccasin" },
@@ -34,18 +41,24 @@
     { hex: "#9c27b0", name: "Purple" },
     { hex: "#4fc3f7", name: "Sky" },
     { hex: "#81c784", name: "Sage" },
+    { hex: "#4b2142", name: "Merlot" },
+    { hex: "#2d4a2f", name: "Moss" },
   ];
   const TEXT_COLORS = [
     { hex: "#2e8b57", name: "Green" },
     { hex: "#ffd700", name: "Yellow" },
     { hex: "#1a1a2e", name: "Navy" },
     { hex: "#ffffff", name: "White" },
+    { hex: "#fffaf0", name: "Ivory" },
+    { hex: "#f5fbff", name: "Ice" },
     { hex: "#4b0082", name: "Indigo" },
     { hex: "#dc143c", name: "Crimson" },
     { hex: "#ff4500", name: "Orange" },
     { hex: "#228b22", name: "Forest" },
     { hex: "#8b4513", name: "Brown" },
     { hex: "#000000", name: "Black" },
+    { hex: "#111827", name: "Carbon" },
+    { hex: "#153243", name: "Ink" },
     { hex: "#e91e63", name: "Magenta" },
     { hex: "#00bcd4", name: "Cyan" },
     { hex: "#795548", name: "Umber" },
@@ -56,6 +69,14 @@
     { hex: "#ff9800", name: "Amber" },
     { hex: "#f44336", name: "Red" },
     { hex: "#3f51b5", name: "Blue" },
+    { hex: "#5b1a18", name: "Oxblood" },
+    { hex: "#0f5132", name: "Pine" },
+  ];
+  const PANEL_PATTERNS = [
+    { name: "grid", size: 26, opacity: 0.08, colorAlpha: 0.075 },
+    { name: "dots", size: 24, opacity: 0.12, colorAlpha: 0.085 },
+    { name: "diagonal", size: 30, opacity: 0.07, colorAlpha: 0.07 },
+    { name: "cross", size: 28, opacity: 0.06, colorAlpha: 0.06 },
   ];
 
   let posts = [];
@@ -72,6 +93,10 @@
   let hideProgressTimeout = null;
   let displayedPostId = null;
   let nextLoadId = 0;
+  let loadingProgressValue = 0;
+  let loadingProgressTarget = 0;
+  let loadingProgressInterval = null;
+  let currentPanelPatternSeed = "threadframe";
   try {
     soundOn = sessionStorage.getItem("frameSoundOn") === "1";
     randomMode = sessionStorage.getItem("frameRandomMode") === "1";
@@ -96,6 +121,8 @@
     loadingStatus: document.getElementById("loading-status"),
     loadingDetail: document.getElementById("loading-detail"),
     loadingThreadId: document.getElementById("loading-thread-id"),
+    loadingProgressFill: document.getElementById("loading-progress-fill"),
+    loadingProgressValue: document.getElementById("loading-progress-value"),
     splash: document.querySelector(".splash"),
     splashSlides: document.querySelectorAll(".splash-slide"),
     reconnect: document.querySelector(".reconnect"),
@@ -105,6 +132,131 @@
     mediaTimeCurrent: document.querySelector(".media-time-current"),
     mediaTimeTotal: document.querySelector(".media-time-total"),
   };
+
+  function parseColor(color) {
+    if (typeof color !== "string") return null;
+    const value = color.trim();
+    let match = value.match(/^#([0-9a-f]{3})$/i);
+    if (match) {
+      const [r, g, b] = match[1].split("").map((part) => parseInt(part + part, 16));
+      return { r, g, b };
+    }
+    match = value.match(/^#([0-9a-f]{6})$/i);
+    if (match) {
+      return {
+        r: parseInt(match[1].slice(0, 2), 16),
+        g: parseInt(match[1].slice(2, 4), 16),
+        b: parseInt(match[1].slice(4, 6), 16),
+      };
+    }
+    match = value.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+\s*)?\)$/i);
+    if (match) {
+      return {
+        r: Math.max(0, Math.min(255, Number(match[1]))),
+        g: Math.max(0, Math.min(255, Number(match[2]))),
+        b: Math.max(0, Math.min(255, Number(match[3]))),
+      };
+    }
+    return null;
+  }
+
+  function withAlpha(color, alpha, fallback) {
+    const rgb = parseColor(color);
+    if (!rgb) return fallback;
+    return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+  }
+
+  function rgbToCss(rgb, fallback) {
+    if (!rgb) return fallback || "";
+    return `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+  }
+
+  function rgbaFromRgb(rgb, alpha, fallback) {
+    if (!rgb) return fallback || "";
+    return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+  }
+
+  function mixRgb(a, b, amount) {
+    if (!a || !b) return a || b || null;
+    const weight = Math.max(0, Math.min(1, amount));
+    return {
+      r: Math.round(a.r + (b.r - a.r) * weight),
+      g: Math.round(a.g + (b.g - a.g) * weight),
+      b: Math.round(a.b + (b.b - a.b) * weight),
+    };
+  }
+
+  function relativeLuminance(color) {
+    const rgb = typeof color === "string" ? parseColor(color) : color;
+    if (!rgb) return 0;
+    const channels = [rgb.r, rgb.g, rgb.b].map((value) => {
+      const normalized = value / 255;
+      return normalized <= 0.03928
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  }
+
+  function contrastRatio(bgColor, textColor) {
+    const bgLuma = relativeLuminance(bgColor);
+    const textLuma = relativeLuminance(textColor);
+    const lighter = Math.max(bgLuma, textLuma);
+    const darker = Math.min(bgLuma, textLuma);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  function pickContrastText(bgColor, seed) {
+    const scored = TEXT_COLORS.map((color) => ({
+      ...color,
+      contrast: contrastRatio(bgColor, color.hex),
+    })).sort((a, b) => b.contrast - a.contrast);
+    let candidates = scored.filter((color) => color.contrast >= 4.5);
+    if (candidates.length === 0) candidates = scored.filter((color) => color.contrast >= 3.6);
+    if (candidates.length === 0) candidates = scored.slice(0, Math.min(4, scored.length));
+    const pool = candidates.slice(0, Math.min(4, candidates.length));
+    return pool[hashString(seed) % pool.length] || { hex: DEFAULT_PANEL_TEXT };
+  }
+
+  function createPaletteFromBackground(bgColor, seed, accentSource) {
+    const bgRgb = parseColor(bgColor) || parseColor(DEFAULT_PANEL_BG);
+    const textChoice = pickContrastText(bgColor, seed);
+    const textRgb = parseColor(textChoice.hex) || parseColor(DEFAULT_PANEL_TEXT);
+    const accentRgb = mixRgb(accentSource || bgRgb, textRgb, 0.18);
+    return {
+      bg: rgbToCss(bgRgb, DEFAULT_PANEL_BG),
+      text: textChoice.hex,
+      accent: rgbaFromRgb(accentRgb, 0.2, "rgba(44,42,38,0.2)"),
+      divider: withAlpha(textChoice.hex, 0.2, "rgba(44,42,38,0.2)"),
+    };
+  }
+
+  function hashString(value) {
+    const input = String(value || "threadframe");
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      hash = (hash * 31 + input.charCodeAt(i)) | 0;
+    }
+    return Math.abs(hash);
+  }
+
+  function setPanelPattern(seed, textColor) {
+    if (!el.panelTypography || PANEL_PATTERNS.length === 0) return;
+    const preset = PANEL_PATTERNS[hashString(seed) % PANEL_PATTERNS.length];
+    el.panelTypography.dataset.pattern = preset.name;
+    el.panelTypography.style.setProperty("--panel-pattern-size", preset.size + "px");
+    el.panelTypography.style.setProperty("--panel-pattern-opacity", String(preset.opacity));
+    el.panelTypography.style.setProperty(
+      "--panel-pattern-color",
+      withAlpha(textColor, preset.colorAlpha, `rgba(44,42,38,${preset.colorAlpha})`)
+    );
+  }
+
+  function setPanelPatternForPost(post) {
+    currentPanelPatternSeed =
+      (post && (post.id || post.permalink || post.timestamp || post.media_url)) || "threadframe";
+    setPanelPattern(currentPanelPatternSeed, lastAppliedColors?.text || DEFAULT_PANEL_TEXT);
+  }
 
   function updateSoundButton() {
     if (!el.soundToggle) return;
@@ -126,7 +278,10 @@
     if (!el.counter) return;
     const total = posts.length;
     const current = total ? index + 1 : 0;
-    el.counter.textContent = current + "/" + total;
+    const digits = Math.max(2, String(Math.max(total, 0)).length);
+    const currentLabel = String(current).padStart(digits, "0");
+    const totalLabel = String(total).padStart(digits, "0");
+    el.counter.textContent = currentLabel + " / " + totalLabel;
   }
 
   function formatTime(seconds) {
@@ -164,26 +319,69 @@
     }, PROGRESS_REVEAL_MS);
   }
 
-  const CAPTION_FONT_MIN = 14;
-  const CAPTION_FONT_MAX = 30;
-  const CAPTION_FONT_STEP = 4;
+  const CAPTION_FONT_MIN = 15;
+  const CAPTION_FONT_MAX = 34;
+  const CAPTION_FONT_STEP = 2;
+
+  function getCaptionMetrics() {
+    const density = el.captionText?.dataset.density || "medium";
+    if (density === "short") {
+      return { min: 22, max: 44, step: 2, lineHeight: 1.24 };
+    }
+    if (density === "long") {
+      return { min: 14, max: 28, step: 1, lineHeight: 1.64 };
+    }
+    return { min: 16, max: 33, step: 2, lineHeight: 1.56 };
+  }
+
+  function renderCaptionText(text) {
+    if (!el.captionText) return;
+    const raw = typeof text === "string" ? text : "";
+    const normalized = raw.replace(/\r\n?/g, "\n").trim();
+    el.captionText.textContent = "";
+
+    if (!normalized) {
+      el.captionText.dataset.density = "empty";
+      if (el.captionWrap) el.captionWrap.dataset.density = "empty";
+      el.captionText.textContent = "\u00A0";
+      return;
+    }
+
+    const paragraphs = normalized.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+    const charCount = normalized.replace(/\s+/g, " ").trim().length;
+    const density =
+      charCount <= 60 && paragraphs.length <= 1
+        ? "short"
+        : charCount <= 180 && paragraphs.length <= 2
+          ? "medium"
+          : "long";
+
+    el.captionText.dataset.density = density;
+    if (el.captionWrap) el.captionWrap.dataset.density = density;
+    for (const paragraphText of paragraphs) {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = paragraphText;
+      el.captionText.appendChild(paragraph);
+    }
+  }
 
   function fitCaptionFont() {
     if (!el.captionText || !el.panelBody) return;
-    const container = el.panelBody;
+    const container = el.captionWrap || el.panelBody;
     const textEl = el.captionText;
-    const lineHeight = 1.7;
-    const maxHeight = container.clientHeight;
+    const metrics = getCaptionMetrics();
+    const lineHeight = metrics.lineHeight;
+    const maxHeight = Math.max(0, container.clientHeight - 28);
     if (maxHeight <= 0) return;
     textEl.style.lineHeight = lineHeight;
-    let size = CAPTION_FONT_MIN;
+    let size = metrics.min;
     textEl.style.fontSize = size + "px";
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         // 1) Prefer no word break: don't exceed width (no horizontal overflow)
         // 2) Then use as much height as possible
-        while (size < CAPTION_FONT_MAX) {
-          const nextSize = size + CAPTION_FONT_STEP;
+        while (size < metrics.max) {
+          const nextSize = size + metrics.step;
           textEl.style.fontSize = nextSize + "px";
           const overWidth = textEl.scrollWidth > textEl.clientWidth;
           const overHeight = textEl.scrollHeight > maxHeight;
@@ -199,12 +397,62 @@
 
   function showLoading(show) {
     if (el.loading) el.loading.style.display = show ? "flex" : "none";
+    if (!show) stopLoadingProgress();
   }
   function updateLoadingStatus(text) {
     if (el.loadingStatus) el.loadingStatus.textContent = text;
   }
   function updateLoadingDetail(text) {
     if (el.loadingDetail) el.loadingDetail.textContent = text || "";
+  }
+  function renderLoadingProgress(value) {
+    const safeValue = Math.max(0, Math.min(100, value));
+    if (el.loadingProgressFill) el.loadingProgressFill.style.width = safeValue + "%";
+    if (el.loadingProgressValue) el.loadingProgressValue.textContent = Math.round(safeValue) + "%";
+  }
+  function stopLoadingProgress() {
+    if (loadingProgressInterval) {
+      clearInterval(loadingProgressInterval);
+      loadingProgressInterval = null;
+    }
+  }
+  function startLoadingProgress() {
+    stopLoadingProgress();
+    loadingProgressValue = 0;
+    loadingProgressTarget = 12;
+    renderLoadingProgress(loadingProgressValue);
+    loadingProgressInterval = setInterval(() => {
+      if (loadingProgressTarget < LOADING_PROGRESS_MAX) {
+        loadingProgressTarget = Math.min(
+          LOADING_PROGRESS_MAX,
+          loadingProgressTarget + Math.max(0.18, (LOADING_PROGRESS_MAX - loadingProgressTarget) * 0.015)
+        );
+      }
+      if (loadingProgressValue >= loadingProgressTarget) return;
+      loadingProgressValue = Math.min(
+        loadingProgressTarget,
+        loadingProgressValue + Math.max(0.35, (loadingProgressTarget - loadingProgressValue) * 0.22)
+      );
+      renderLoadingProgress(loadingProgressValue);
+    }, LOADING_PROGRESS_TICK_MS);
+  }
+  function bumpLoadingProgress(target) {
+    loadingProgressTarget = Math.max(loadingProgressTarget, Math.min(LOADING_PROGRESS_MAX, target));
+  }
+  function finishLoadingProgress() {
+    if (!el.loadingProgressFill || !el.loadingProgressValue) return Promise.resolve();
+    loadingProgressTarget = 100;
+    return new Promise((resolve) => {
+      const finishCheck = setInterval(() => {
+        if (loadingProgressValue >= 99.5) {
+          loadingProgressValue = 100;
+          renderLoadingProgress(loadingProgressValue);
+          clearInterval(finishCheck);
+          stopLoadingProgress();
+          resolve();
+        }
+      }, 40);
+    });
   }
   function showSplash(show) {
     if (!el.splash) return;
@@ -213,26 +461,11 @@
       el.splashSlides.forEach((s, i) => s.classList.toggle("splash-slide-active", i === 0));
     }
   }
-  /** Runs splash slides; when both slides and waitFor (e.g. first video canplay) are done, hides splash and calls done. */
-  function runSplashThenShowPost(done, waitFor) {
-    const slidePromise = new Promise((resolve) => {
-      if (!el.splash || !el.splashSlides.length) {
-        resolve();
-        return;
-      }
-      let current = 0;
-      const next = () => {
-        current++;
-        if (current >= SPLASH_SLIDE_COUNT) {
-          resolve();
-          return;
-        }
-        el.splashSlides.forEach((s, i) => s.classList.toggle("splash-slide-active", i === current));
-        setTimeout(next, SPLASH_SLIDE_DURATION_MS);
-      };
-      setTimeout(next, SPLASH_SLIDE_DURATION_MS);
-    });
-    Promise.all([slidePromise, waitFor ? waitFor : Promise.resolve()]).then(() => {
+  function runLaunchSplashThenShowPost(done, waitFor) {
+    Promise.all([
+      new Promise((resolve) => setTimeout(resolve, FINAL_SPLASH_DURATION_MS)),
+      waitFor ? waitFor : Promise.resolve(),
+    ]).then(() => {
       showSplash(false);
       requestAnimationFrame(() => requestAnimationFrame(() => {
         if (done) done();
@@ -242,8 +475,13 @@
   function applyRandomPalette() {
     if (!el.panelTypography || BACKGROUNDS.length === 0 || TEXT_COLORS.length === 0) return;
     const bg = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)];
-    const text = TEXT_COLORS[Math.floor(Math.random() * TEXT_COLORS.length)];
-    applyPalette({ bg: bg.hex, text: text.hex, codeBg: bg.name, codeText: text.name });
+    const palette = createPaletteFromBackground(bg.hex, currentPanelPatternSeed + "-random", parseColor(bg.hex));
+    const textChoice = pickContrastText(bg.hex, currentPanelPatternSeed + "-random");
+    applyPalette({
+      ...palette,
+      codeBg: bg.name,
+      codeText: textChoice.name,
+    });
   }
   function showReconnect(show, message) {
     if (!el.reconnect) return;
@@ -289,21 +527,55 @@
     }
   }
 
+  function formatMetric(value) {
+    if (value == null || Number.isNaN(Number(value))) return "-";
+    try {
+      return new Intl.NumberFormat("en-US", {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }).format(Number(value));
+    } catch (_) {
+      return String(value);
+    }
+  }
+
+  function createMetaItem(label, value, modifier) {
+    const item = document.createElement("span");
+    item.className = "post-meta-item" + (modifier ? " " + modifier : "");
+
+    const labelEl = document.createElement("span");
+    labelEl.className = "post-meta-label";
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement("span");
+    valueEl.className = "post-meta-value";
+    valueEl.textContent = value;
+
+    item.appendChild(labelEl);
+    item.appendChild(valueEl);
+    return item;
+  }
+
+  function renderPostMeta(dateStr, likesValue) {
+    if (!el.postMeta) return;
+    el.postMeta.textContent = "";
+    if (dateStr) el.postMeta.appendChild(createMetaItem("Posted", dateStr, "post-meta-date"));
+    el.postMeta.appendChild(createMetaItem("Likes", likesValue == null ? "-" : formatMetric(likesValue), "post-meta-likes"));
+  }
+
   function updatePostMeta(post) {
     if (!el.postMeta) return;
     const dateStr = formatPostDate(post.timestamp);
     const id = post.id;
     displayedPostId = id;
-    el.postMeta.textContent = dateStr ? dateStr + " · ♥ —" : "♥ —";
+    renderPostMeta(dateStr, null);
     if (!id) return;
     fetch("/api/insights?id=" + encodeURIComponent(id))
       .then((res) => res.json())
       .then((data) => {
         if (displayedPostId !== id) return;
         const likes = data.likes != null ? Number(data.likes) : null;
-        const likeStr = likes != null ? String(likes) : "—";
-        const base = dateStr ? dateStr + " · ♥ " : "♥ ";
-        el.postMeta.textContent = base + likeStr;
+        renderPostMeta(dateStr, likes);
       })
       .catch(() => {});
   }
@@ -369,17 +641,30 @@
 
   function pantoneLike(rgb) {
     let { r, g, b } = rgb;
-    const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     const hsl = rgbToHsl(r, g, b);
-    const desat = Math.max(0, hsl.s - 12);
-    const dark = hslToRgb(hsl.h, desat, Math.min(18, hsl.l * 0.35));
-    const bg = `rgb(${dark.r},${dark.g},${dark.b})`;
-    const text = luma > 0.5 ? "#1a1a1a" : "#e8e8e8";
-    const accentR = Math.min(255, Math.round(r * 0.5 + 80));
-    const accentG = Math.min(255, Math.round(g * 0.5 + 80));
-    const accentB = Math.min(255, Math.round(b * 0.5 + 80));
-    const accent = `rgba(${accentR},${accentG},${accentB},0.35)`;
-    return { bg, text, accent };
+    const seed = hashString(`${currentPanelPatternSeed}-${r}-${g}-${b}`);
+    const hueShift = [0, -18, 14, 26][seed % 4];
+    const shiftedHue = (hsl.h + hueShift + 360) % 360;
+    const prefersLightPanel = hsl.l > 58 || seed % 5 === 0;
+
+    let bgRgb;
+    if (prefersLightPanel) {
+      const softTone = hslToRgb(
+        shiftedHue,
+        Math.max(12, Math.min(38, hsl.s * 0.42)),
+        Math.max(80, Math.min(92, 88 - hsl.s * 0.05))
+      );
+      bgRgb = mixRgb(softTone, { r: 255, g: 249, b: 242 }, 0.32);
+    } else {
+      const deepTone = hslToRgb(
+        shiftedHue,
+        Math.max(18, Math.min(52, hsl.s * 0.58)),
+        Math.max(18, Math.min(30, 17 + hsl.l * 0.14))
+      );
+      bgRgb = mixRgb(deepTone, { r: 14, g: 16, b: 20 }, 0.22);
+    }
+
+    return createPaletteFromBackground(rgbToCss(bgRgb, DEFAULT_PANEL_BG), `${currentPanelPatternSeed}-source`, rgb);
   }
 
   function applyPalette(palette) {
@@ -387,6 +672,15 @@
     lastAppliedColors = palette;
     el.panelTypography.style.setProperty("--panel-bg", palette.bg);
     el.panelTypography.style.setProperty("--panel-text", palette.text);
+    el.panelTypography.style.setProperty(
+      "--panel-accent",
+      palette.accent || withAlpha(palette.text, 0.14, "rgba(44,42,38,0.14)")
+    );
+    el.panelTypography.style.setProperty(
+      "--panel-divider",
+      palette.divider || withAlpha(palette.text, 0.18, "rgba(44,42,38,0.18)")
+    );
+    setPanelPattern(currentPanelPatternSeed, palette.text || DEFAULT_PANEL_TEXT);
     if (el.container) el.container.style.setProperty("--ui-text", palette.text);
   }
 
@@ -394,6 +688,9 @@
     if (!el.panelTypography) return;
     el.panelTypography.style.setProperty("--panel-bg", DEFAULT_PANEL_BG);
     el.panelTypography.style.setProperty("--panel-text", DEFAULT_PANEL_TEXT);
+    el.panelTypography.style.setProperty("--panel-accent", "rgba(44,42,38,0.14)");
+    el.panelTypography.style.setProperty("--panel-divider", "rgba(44,42,38,0.18)");
+    setPanelPattern(currentPanelPatternSeed, DEFAULT_PANEL_TEXT);
     if (el.container) el.container.style.setProperty("--ui-text", DEFAULT_PANEL_TEXT);
     lastAppliedColors = null;
     if (el.postMeta) el.postMeta.textContent = "";
@@ -460,9 +757,10 @@
     if (!hadContent) {
       /* First load: media already preloaded during loading screen — show and play immediately */
       clearTimers();
+      setPanelPatternForPost(post);
       applyRandomPalette();
       updatePostMeta(post);
-      if (el.captionText) el.captionText.textContent = post.text || "\u00A0";
+      renderCaptionText(post.text);
       if (el.captionWrap) {
         el.captionWrap.classList.remove("visible");
         setTimeout(() => {
@@ -534,9 +832,10 @@
     const thisLoadId = ++nextLoadId;
 
     function applyPostToUI(p) {
+      setPanelPatternForPost(p);
       applyRandomPalette();
       updatePostMeta(p);
-      if (el.captionText) el.captionText.textContent = p.text || "\u00A0";
+      renderCaptionText(p.text);
       if (el.captionWrap) {
         el.captionWrap.classList.remove("visible");
         setTimeout(() => {
@@ -695,9 +994,12 @@
 
   async function fetchPosts() {
     showReconnect(false);
+    showSplash(false);
     showLoading(true);
+    startLoadingProgress();
     updateLoadingStatus("Connecting to Threads…");
     updateLoadingDetail("Checking authentication");
+    updateLoadingStatus("Connecting to Threads...");
     try {
       const all = [];
       let cursor = null;
@@ -707,6 +1009,8 @@
         updateLoadingStatus("Fetching your posts…");
         updateLoadingDetail(page === 1 ? "Requesting first page" : "Page " + page + " — " + all.length + " so far");
 
+        updateLoadingStatus("Fetching your posts...");
+        updateLoadingDetail(page === 1 ? "Requesting first page" : "Loading page " + page + " - " + all.length + " collected");
         const url = cursor
           ? "/api/posts?limit=50&cursor=" + encodeURIComponent(cursor)
           : "/api/posts?limit=50";
@@ -723,15 +1027,20 @@
         const list = Array.isArray(data.data) ? data.data : [];
         all.push(...list);
         cursor = data.cursor || null;
+        bumpLoadingProgress(18 + Math.min(58, page * 8));
         updateLoadingDetail(all.length + " posts received" + (cursor ? " · fetching more…" : ""));
+        updateLoadingDetail(all.length + " posts received" + (cursor ? " - loading next batch..." : " - preparing launch"));
       } while (cursor);
 
       updateLoadingStatus("Preparing your thread…");
       updateLoadingDetail("Filtering posts with media");
+      updateLoadingStatus("Preparing your thread...");
+      bumpLoadingProgress(90);
       posts = all.filter((p) => getMediaUrl(p));
       nextCursor = null;
 
       if (posts.length === 0) {
+        await finishLoadingProgress();
         showLoading(false);
         el.mediaWrap.innerHTML = '<div class="empty-state">No posts with media.</div>';
         if (el.postMeta) el.postMeta.textContent = "";
@@ -743,8 +1052,6 @@
       const firstUrl = getMediaUrl(firstPost);
       const firstIsVid = isVideo(firstPost);
 
-      showLoading(false);
-      showSplash(true);
       /* Do not show any real thread content during load. Preload first media off-screen only. */
       if (el.mediaWrap) el.mediaWrap.innerHTML = "";
       if (el.mediaPreload) el.mediaPreload.innerHTML = "";
@@ -779,7 +1086,18 @@
         });
       }
 
-      runSplashThenShowPost(() => showPost(), firstMediaReady);
+      updateLoadingStatus("Finalizing launch...");
+      updateLoadingDetail("Preparing first frame");
+      bumpLoadingProgress(96);
+      await firstMediaReady;
+      updateLoadingStatus("Ready");
+      updateLoadingDetail("Opening Threadframe");
+      await finishLoadingProgress();
+      showLoading(false);
+      showSplash(true);
+      runLaunchSplashThenShowPost(() => showPost());
+      return;
+
     } catch (err) {
       showLoading(false);
       showReconnect(true, "Could not load posts. " + (err.message || ""));
