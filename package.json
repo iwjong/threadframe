@@ -9,12 +9,18 @@
     "dev": "node server.js --dev"
   },
   "dependencies": {
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "three": "^0.183.2"
   },
   "engines": {
     "node": ">=20"
   },
-  "keywords": ["threads", "meta", "frame", "prototype"],
+  "keywords": [
+    "threads",
+    "meta",
+    "frame",
+    "prototype"
+  ],
   "author": "",
   "license": "UNLICENSED",
   "private": true

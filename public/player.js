@@ -1,3 +1,5 @@
+import * as THREE from "/vendor/three.module.js";
+
 /**
  * FREN Frame Player — 2:1 magazine layout, color extraction, counter, arrows, random.
  */
@@ -97,6 +99,7 @@
   let loadingProgressTarget = 0;
   let loadingProgressInterval = null;
   let currentPanelPatternSeed = "threadframe";
+  let media3DStage = null;
   try {
     soundOn = sessionStorage.getItem("frameSoundOn") === "1";
     randomMode = sessionStorage.getItem("frameRandomMode") === "1";
@@ -105,6 +108,8 @@
   const el = {
     container: document.querySelector(".frame-container"),
     panelMedia: document.querySelector(".panel-media"),
+    mediaStage: document.querySelector(".media-stage"),
+    media3DLayer: document.querySelector(".media-3d-layer"),
     mediaWrap: document.querySelector(".media-wrap"),
     mediaPreload: document.querySelector(".media-preload"),
     panelTypography: document.querySelector(".panel-typography"),
@@ -256,6 +261,416 @@
     currentPanelPatternSeed =
       (post && (post.id || post.permalink || post.timestamp || post.media_url)) || "threadframe";
     setPanelPattern(currentPanelPatternSeed, lastAppliedColors?.text || DEFAULT_PANEL_TEXT);
+  }
+
+  function createDisabledMedia3DStage() {
+    return {
+      enabled: false,
+      clear() {
+        el.mediaWrap?.classList.remove("media-wrap-3d-active");
+        el.media3DLayer?.classList.remove("media-3d-visible");
+      },
+      resize() {},
+      setSource() {
+        this.clear();
+      },
+      syncPalette() {},
+    };
+  }
+
+  function fitTextureToSquare(texture, width, height) {
+    if (!texture || !width || !height) return;
+    const aspect = width / height;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.center.set(0.5, 0.5);
+    texture.offset.set(0, 0);
+    texture.repeat.set(1, 1);
+    if (aspect > 1) {
+      const repeatX = 1 / aspect;
+      texture.repeat.set(repeatX, 1);
+      texture.offset.set((1 - repeatX) / 2, 0);
+    } else if (aspect < 1) {
+      const repeatY = aspect;
+      texture.repeat.set(1, repeatY);
+      texture.offset.set(0, (1 - repeatY) / 2);
+    }
+  }
+
+  function drawGlassTextureCanvas(canvas, side) {
+    if (!canvas) return;
+    const size = canvas.width || 512;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const isRight = side === "right";
+    const startX = isRight ? size : 0;
+    const endX = isRight ? size * 0.48 : size * 0.52;
+    const shimmerStartX = isRight ? size * 0.84 : size * 0.16;
+    const shimmerEndX = isRight ? size * 0.56 : size * 0.44;
+    const radialX = isRight ? size * 0.9 : size * 0.1;
+
+    ctx.clearRect(0, 0, size, size);
+
+    const sweep = ctx.createLinearGradient(startX, size, endX, size * 0.24);
+    sweep.addColorStop(0, "rgba(255,255,255,0.05)");
+    sweep.addColorStop(0.12, "rgba(255,255,255,0.018)");
+    sweep.addColorStop(0.28, "rgba(255,255,255,0.006)");
+    sweep.addColorStop(0.46, "rgba(255,255,255,0)");
+    sweep.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sweep;
+    ctx.fillRect(0, 0, size, size);
+
+    const cornerBloom = ctx.createRadialGradient(radialX, size * 0.92, 0, radialX, size * 0.92, size * 0.46);
+    cornerBloom.addColorStop(0, "rgba(255,255,255,0.04)");
+    cornerBloom.addColorStop(0.18, "rgba(255,255,255,0.015)");
+    cornerBloom.addColorStop(0.42, "rgba(255,255,255,0.004)");
+    cornerBloom.addColorStop(0.72, "rgba(255,255,255,0)");
+    ctx.fillStyle = cornerBloom;
+    ctx.fillRect(0, 0, size, size);
+
+    const band = ctx.createLinearGradient(shimmerStartX, size, shimmerEndX, size * 0.16);
+    band.addColorStop(0, "rgba(255,255,255,0)");
+    band.addColorStop(0.28, "rgba(255,255,255,0.024)");
+    band.addColorStop(0.44, "rgba(255,255,255,0.008)");
+    band.addColorStop(0.62, "rgba(255,255,255,0)");
+    ctx.fillStyle = band;
+    ctx.fillRect(0, 0, size, size);
+
+    ctx.lineCap = "round";
+    for (let i = 0; i < 22; i++) {
+      const x = isRight
+        ? size - (((i * 71) % Math.round(size * 0.34)) + 8)
+        : ((i * 71) % Math.round(size * 0.34)) + 8;
+      const y = size * 0.54 + ((i * 37) % Math.round(size * 0.42));
+      const dx = isRight ? -14 - (i % 4) * 8 : 14 + (i % 4) * 8;
+      const dy = -70 - (i % 5) * 18;
+      ctx.strokeStyle = `rgba(255,255,255,${i % 5 === 0 ? 0.012 : 0.005})`;
+      ctx.lineWidth = i % 6 === 0 ? 0.9 : 0.4;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + dx, y + dy);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 38; i++) {
+      const x = isRight
+        ? size - ((i * 43) % Math.round(size * 0.38))
+        : (i * 43) % Math.round(size * 0.38);
+      const y = size * 0.58 + ((i * 89) % Math.round(size * 0.34));
+      const radius = i % 7 === 0 ? 1.4 : 0.8;
+      ctx.fillStyle = `rgba(255,255,255,${i % 8 === 0 ? 0.014 : 0.006})`;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function createGlassTextureCanvas(side) {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    drawGlassTextureCanvas(canvas, side);
+    return canvas;
+  }
+
+  function createMedia3DStage() {
+    if (!el.mediaStage || !el.media3DLayer || typeof window === "undefined" || typeof window.WebGLRenderingContext === "undefined") {
+      return createDisabledMedia3DStage();
+    }
+
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: "high-performance",
+      });
+    } catch (_) {
+      return createDisabledMedia3DStage();
+    }
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.domElement.className = "media-3d-canvas";
+
+    el.media3DLayer.textContent = "";
+    el.media3DLayer.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 12);
+    camera.position.set(0, 0, 3.35);
+
+    const stageGroup = new THREE.Group();
+    stageGroup.position.set(0, 0, 0.03);
+    stageGroup.rotation.set(0, 0, 0);
+    stageGroup.visible = false;
+    scene.add(stageGroup);
+
+    const frontMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      toneMapped: false,
+    });
+    const edgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x121215,
+      roughness: 0.82,
+      metalness: 0.16,
+    });
+    const backMaterial = new THREE.MeshStandardMaterial({
+      color: 0x08090b,
+      roughness: 0.9,
+      metalness: 0.1,
+    });
+
+    const coverMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.58, 1.58, 0.028),
+      [edgeMaterial, edgeMaterial, edgeMaterial, edgeMaterial, frontMaterial, backMaterial]
+    );
+    coverMesh.castShadow = true;
+    coverMesh.receiveShadow = false;
+    stageGroup.add(coverMesh);
+
+    const glassSide = "right";
+    const glassTexture = new THREE.CanvasTexture(createGlassTextureCanvas(glassSide));
+    glassTexture.colorSpace = THREE.SRGBColorSpace;
+    glassTexture.generateMipmaps = false;
+    glassTexture.minFilter = THREE.LinearFilter;
+    glassTexture.magFilter = THREE.LinearFilter;
+
+    const glassOverlay = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.56, 1.56),
+      new THREE.MeshBasicMaterial({
+        map: glassTexture,
+        transparent: true,
+        opacity: 0.06,
+        depthWrite: false,
+      })
+    );
+    glassOverlay.position.z = 0.016;
+    glassOverlay.visible = false;
+    stageGroup.add(glassOverlay);
+
+    const coverShadow = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.25, 2.25),
+      new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.24 })
+    );
+    coverShadow.position.z = -0.18;
+    coverShadow.receiveShadow = true;
+    coverShadow.visible = false;
+    scene.add(coverShadow);
+
+    const glowPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.1, 2.1),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.04,
+        depthWrite: false,
+      })
+    );
+    glowPlane.position.z = -0.28;
+    glowPlane.visible = false;
+    scene.add(glowPlane);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.7);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.9);
+    keyLight.position.set(1.2, 1.8, 3.1);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    keyLight.shadow.bias = -0.0008;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 10;
+    keyLight.shadow.camera.left = -2;
+    keyLight.shadow.camera.right = 2;
+    keyLight.shadow.camera.top = 2;
+    keyLight.shadow.camera.bottom = -2;
+    scene.add(keyLight);
+    scene.add(keyLight.target);
+
+    const fillLight = new THREE.DirectionalLight(0xbfd3ff, 0.36);
+    fillLight.position.set(-1.8, -0.8, 2.4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.PointLight(0xfff2db, 0.42, 8);
+    rimLight.position.set(-0.9, 1.05, 1.8);
+    scene.add(rimLight);
+
+    let currentTexture = null;
+    let currentSourceIsVideo = false;
+    let renderRaf = 0;
+    let continuousRender = false;
+    let sourceToken = 0;
+
+    function hideStage() {
+      el.mediaWrap?.classList.remove("media-wrap-3d-active");
+      el.media3DLayer?.classList.remove("media-3d-visible");
+      stageGroup.visible = false;
+      glassOverlay.visible = false;
+      coverShadow.visible = false;
+      glowPlane.visible = false;
+    }
+
+    function showStage() {
+      el.mediaWrap?.classList.add("media-wrap-3d-active");
+      el.media3DLayer?.classList.add("media-3d-visible");
+      stageGroup.visible = true;
+      glassOverlay.visible = true;
+      coverShadow.visible = true;
+      glowPlane.visible = true;
+    }
+
+    function stopRenderLoop() {
+      continuousRender = false;
+      if (renderRaf) {
+        cancelAnimationFrame(renderRaf);
+        renderRaf = 0;
+      }
+    }
+
+    function renderFrame() {
+      renderRaf = 0;
+      renderer.render(scene, camera);
+      if (continuousRender) {
+        renderRaf = requestAnimationFrame(renderFrame);
+      }
+    }
+
+    function requestRender(continuous) {
+      if (!continuous && continuousRender && renderRaf) {
+        cancelAnimationFrame(renderRaf);
+        renderRaf = 0;
+      }
+      continuousRender = Boolean(continuous);
+      if (!renderRaf) {
+        renderRaf = requestAnimationFrame(renderFrame);
+      }
+    }
+
+    function disposeTexture() {
+      if (currentTexture) {
+        currentTexture.dispose();
+        currentTexture = null;
+      }
+      frontMaterial.map = null;
+      frontMaterial.needsUpdate = true;
+    }
+
+    function resize() {
+      const rect = el.media3DLayer.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      renderer.setSize(rect.width, rect.height, false);
+      camera.aspect = rect.width / rect.height;
+      camera.updateProjectionMatrix();
+      requestRender(currentSourceIsVideo);
+    }
+
+    function syncPalette(palette) {
+      const bgRgb = parseColor(palette?.bg || DEFAULT_PANEL_BG) || parseColor(DEFAULT_PANEL_BG);
+      const textRgb = parseColor(palette?.text || DEFAULT_PANEL_TEXT) || parseColor(DEFAULT_PANEL_TEXT);
+      const edgeRgb = mixRgb(bgRgb, { r: 8, g: 8, b: 10 }, 0.84);
+      const backRgb = mixRgb(edgeRgb, textRgb, 0.12);
+      const glowRgb = mixRgb(bgRgb, { r: 255, g: 255, b: 255 }, 0.18);
+      edgeMaterial.color.set(rgbToCss(edgeRgb, "#121215"));
+      backMaterial.color.set(rgbToCss(backRgb, "#08090b"));
+      fillLight.color.set(rgbToCss(mixRgb(bgRgb, textRgb, 0.22), "#9db6ff"));
+      glowPlane.material.color.set(rgbToCss(glowRgb, "#ffffff"));
+      glowPlane.material.opacity = relativeLuminance(bgRgb) > 0.35 ? 0.035 : 0.055;
+      glassOverlay.material.opacity = relativeLuminance(bgRgb) > 0.35 ? 0.022 : 0.032;
+      requestRender(currentSourceIsVideo);
+    }
+
+    function applyTextureFromSource(source, token) {
+      if (token !== sourceToken || !source) return;
+      const sourceIsVideo = source.tagName === "VIDEO";
+      const texture = sourceIsVideo ? new THREE.VideoTexture(source) : new THREE.Texture(source);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy?.() || 1);
+
+      const width = sourceIsVideo ? source.videoWidth : source.naturalWidth;
+      const height = sourceIsVideo ? source.videoHeight : source.naturalHeight;
+      fitTextureToSquare(texture, width, height);
+      texture.needsUpdate = true;
+
+      disposeTexture();
+      currentTexture = texture;
+      currentSourceIsVideo = sourceIsVideo;
+      frontMaterial.map = texture;
+      frontMaterial.needsUpdate = true;
+      showStage();
+      requestRender(sourceIsVideo);
+    }
+
+    function setSource(source) {
+      sourceToken += 1;
+      const token = sourceToken;
+      hideStage();
+      stopRenderLoop();
+      disposeTexture();
+      if (!source) {
+        renderer.clear();
+        return;
+      }
+
+      const sourceIsVideo = source.tagName === "VIDEO";
+      currentSourceIsVideo = sourceIsVideo;
+      if (sourceIsVideo) {
+        let settled = false;
+        const ready = () => {
+          if (settled) return;
+          settled = true;
+          applyTextureFromSource(source, token);
+        };
+        if (source.readyState >= 2 && source.videoWidth && source.videoHeight) {
+          ready();
+        } else {
+          source.addEventListener("loadeddata", ready, { once: true });
+          source.addEventListener("canplay", ready, { once: true });
+        }
+        return;
+      }
+
+      const ready = () => applyTextureFromSource(source, token);
+      if (source.complete && source.naturalWidth && source.naturalHeight) {
+        ready();
+      } else {
+        source.addEventListener("load", ready, { once: true });
+      }
+    }
+
+    const resizeObserver =
+      typeof window.ResizeObserver === "function"
+        ? new ResizeObserver(() => resize())
+        : null;
+    resizeObserver?.observe(el.media3DLayer);
+
+    resize();
+    syncPalette({ bg: DEFAULT_PANEL_BG, text: DEFAULT_PANEL_TEXT });
+
+    return {
+      enabled: true,
+      clear() {
+        sourceToken += 1;
+        stopRenderLoop();
+        currentSourceIsVideo = false;
+        hideStage();
+        disposeTexture();
+        renderer.clear();
+      },
+      resize,
+      setSource,
+      syncPalette,
+    };
   }
 
   function updateSoundButton() {
@@ -670,6 +1085,18 @@
   function applyPalette(palette) {
     if (!el.panelTypography || !palette) return;
     lastAppliedColors = palette;
+    if (el.container) {
+      el.container.style.setProperty("--panel-bg", palette.bg);
+      el.container.style.setProperty("--panel-text", palette.text);
+      el.container.style.setProperty(
+        "--panel-accent",
+        palette.accent || withAlpha(palette.text, 0.14, "rgba(44,42,38,0.14)")
+      );
+      el.container.style.setProperty(
+        "--panel-divider",
+        palette.divider || withAlpha(palette.text, 0.18, "rgba(44,42,38,0.18)")
+      );
+    }
     el.panelTypography.style.setProperty("--panel-bg", palette.bg);
     el.panelTypography.style.setProperty("--panel-text", palette.text);
     el.panelTypography.style.setProperty(
@@ -682,10 +1109,17 @@
     );
     setPanelPattern(currentPanelPatternSeed, palette.text || DEFAULT_PANEL_TEXT);
     if (el.container) el.container.style.setProperty("--ui-text", palette.text);
+    media3DStage?.syncPalette(palette);
   }
 
   function resetPanelColors() {
     if (!el.panelTypography) return;
+    if (el.container) {
+      el.container.style.setProperty("--panel-bg", DEFAULT_PANEL_BG);
+      el.container.style.setProperty("--panel-text", DEFAULT_PANEL_TEXT);
+      el.container.style.setProperty("--panel-accent", "rgba(44,42,38,0.14)");
+      el.container.style.setProperty("--panel-divider", "rgba(44,42,38,0.18)");
+    }
     el.panelTypography.style.setProperty("--panel-bg", DEFAULT_PANEL_BG);
     el.panelTypography.style.setProperty("--panel-text", DEFAULT_PANEL_TEXT);
     el.panelTypography.style.setProperty("--panel-accent", "rgba(44,42,38,0.14)");
@@ -694,6 +1128,7 @@
     if (el.container) el.container.style.setProperty("--ui-text", DEFAULT_PANEL_TEXT);
     lastAppliedColors = null;
     if (el.postMeta) el.postMeta.textContent = "";
+    media3DStage?.syncPalette({ bg: DEFAULT_PANEL_BG, text: DEFAULT_PANEL_TEXT });
   }
 
   function applyColorsFromSource(source, isVideo) {
@@ -742,6 +1177,8 @@
     }
   }
 
+  media3DStage = createMedia3DStage();
+
   function showPost() {
     if (posts.length === 0) return;
     const post = posts[index];
@@ -787,6 +1224,7 @@
         }
         showMediaProgress(true);
         currentVideo = video;
+        media3DStage?.setSource(video);
         applyColorsFromSource(video, true);
         video.addEventListener("ended", onVideoEnded);
         video.addEventListener("loadedmetadata", () => { updateMediaProgress(0, video.duration); });
@@ -810,6 +1248,7 @@
         }
         img.alt = post.alt_text || post.text || "";
         el.mediaWrap.appendChild(img);
+        media3DStage?.setSource(img);
         applyColorsFromSource(img, false);
         const start = Date.now();
         const totalSec = DURATION_MS / 1000;
@@ -870,6 +1309,7 @@
         el.mediaPreload.removeChild(video);
         el.mediaWrap.appendChild(video);
         currentVideo = video;
+        media3DStage?.setSource(video);
         applyPostToUI(post);
         applyColorsFromSource(video, true);
         video.addEventListener("ended", onVideoEnded);
@@ -889,6 +1329,7 @@
         el.mediaWrap.innerHTML = "";
         showMediaProgress(true);
         el.mediaWrap.appendChild(img);
+        media3DStage?.setSource(img);
         applyPostToUI(post);
         applyColorsFromSource(img, false);
         const start = Date.now();
@@ -989,7 +1430,10 @@
   let resizeTimeout = null;
   window.addEventListener("resize", () => {
     if (resizeTimeout) clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(fitCaptionFont, 150);
+    resizeTimeout = setTimeout(() => {
+      fitCaptionFont();
+      media3DStage?.resize();
+    }, 150);
   });
 
   async function fetchPosts() {
@@ -1042,6 +1486,7 @@
       if (posts.length === 0) {
         await finishLoadingProgress();
         showLoading(false);
+        media3DStage?.clear();
         el.mediaWrap.innerHTML = '<div class="empty-state">No posts with media.</div>';
         if (el.postMeta) el.postMeta.textContent = "";
         updateCounter();
@@ -1053,6 +1498,7 @@
       const firstIsVid = isVideo(firstPost);
 
       /* Do not show any real thread content during load. Preload first media off-screen only. */
+      media3DStage?.clear();
       if (el.mediaWrap) el.mediaWrap.innerHTML = "";
       if (el.mediaPreload) el.mediaPreload.innerHTML = "";
 
