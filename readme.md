@@ -513,4 +513,4 @@ Once all items in Section 8 pass, the prototype is validated. Prioritized for v0
 | Meta App Dashboard | https://developers.facebook.com/apps |
 | mkcert (local HTTPS) | https://mkcert.org |
 | Node.js Download | https://nodejs.org/en/download |
-| FREN Frame README | See `README.md` in project root |
+| Thread Frame README | See `README.md` in project root |
