@@ -28,8 +28,14 @@ html, body {
   position: relative;
   width: 100vw;
   height: 100vh;
-  background: #0a0a0a;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.14), transparent 18%),
+    radial-gradient(circle at top right, var(--panel-accent), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(255,255,255,0.08), transparent 44%),
+    var(--panel-bg);
   --ui-text: #2c2a26;
+  --panel-bg: #f5f2ed;
+  --panel-text: #2c2a26;
   --header-row-height: 2.5rem;
   --icon-size: 1.25rem;
   --text-panel-min: clamp(20rem, 26vw, 28rem);
@@ -38,6 +44,9 @@ html, body {
   --panel-pattern-size: 28px;
   --panel-pattern-opacity: 0.08;
   --panel-pattern-color: rgba(44,42,38,0.08);
+  --media-stage-edge: rgba(255,255,255,0.08);
+  --media-stage-glow: rgba(255,255,255,0.16);
+  transition: background 0.6s ease;
 }
 
 .frame-layout {
@@ -55,37 +64,82 @@ html, body {
   justify-content: center;
   min-width: 0;
   min-height: min(100vw, 60vh);
-  padding: clamp(0.75rem, 1.8vw, 1.5rem);
-  background:
-    radial-gradient(circle at center, rgba(255,255,255,0.08), transparent 55%),
-    #000;
+  padding: clamp(0.75rem, 1.8vw, 1.5rem) clamp(0.75rem, 1.8vw, 1.5rem) clamp(0.75rem, 1.8vw, 1.5rem) 10px;
+  background: transparent;
 }
 
 .media-stage {
   position: relative;
+  isolation: isolate;
   width: min(100%, 60vh);
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  background: #000;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.28);
+  /* border-radius: clamp(0.55rem, 0.9vw, 0.8rem); */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 18%),
+    linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.26)),
+    var(--panel-bg);
+  box-shadow:
+    0 28px 72px rgba(12, 7, 4, 0.46),
+    0 8px 22px rgba(20, 12, 8, 0.32);
+}
+
+.media-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 22%),
+    radial-gradient(circle at 50% 100%, var(--panel-accent), transparent 42%);
+  opacity: 1;
+  pointer-events: none;
 }
 
 .media-stage::after {
   content: "";
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+  z-index: 4;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px var(--panel-divider),
+    inset 0 1px 0 rgba(255,255,255,0.07);
   pointer-events: none;
+}
+
+.media-3d-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.media-3d-layer.media-3d-visible {
+  opacity: 1;
+}
+
+.media-3d-layer canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
 }
 
 .media-wrap {
   position: absolute;
   inset: 0;
+  z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #000;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.18)),
+    var(--panel-bg);
 }
 
 .media-wrap img,
@@ -94,6 +148,12 @@ html, body {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: opacity 0.28s ease;
+}
+
+.media-wrap.media-wrap-3d-active > img,
+.media-wrap.media-wrap-3d-active > video {
+  opacity: 0;
 }
 
 /* Off-screen preload so next media loads in background */
@@ -116,6 +176,7 @@ html, body {
 .media-progress {
   display: none;
   position: absolute;
+  z-index: 3;
   bottom: 0;
   left: 0;
   right: 0;
@@ -173,13 +234,9 @@ html, body {
   flex-direction: column;
   padding: 0;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.14), transparent 18%),
-    radial-gradient(circle at top right, var(--panel-accent), transparent 34%),
-    radial-gradient(circle at bottom left, rgba(255,255,255,0.08), transparent 44%),
-    var(--panel-bg);
+  background: transparent;
   color: var(--panel-text);
-  transition: background 0.6s ease, color 0.5s ease;
+  transition: color 0.5s ease;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -237,8 +294,7 @@ html, body {
   justify-content: space-between;
   gap: 0.85rem;
   min-height: var(--header-row-height);
-  padding: 1rem clamp(1rem, 2.4vw, 1.5rem) 0.85rem;
-  border-bottom: 1px solid var(--panel-divider);
+  padding: 1rem clamp(1rem, 2.4vw, 1.5rem) 0.85rem 0;
 }
 .post-meta {
   flex: 1;
@@ -303,7 +359,7 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: clamp(1.15rem, 3vw, 2rem) clamp(1rem, 2.4vw, 1.5rem);
+  padding: clamp(1.15rem, 3vw, 2rem) clamp(1rem, 2.4vw, 1.5rem) clamp(1.15rem, 3vw, 2rem) 0;
   overflow: hidden;
 }
 .caption-wrap {
@@ -333,7 +389,7 @@ html, body {
 .caption-wrap[data-density="short"]::before {
   width: clamp(3.25rem, 10vw, 5.25rem);
   height: 1.5px;
-  opacity: 1;
+  opacity: 0;
 }
 .caption-wrap.visible {
   opacity: 1;
@@ -396,10 +452,9 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
-  padding: 0.7rem clamp(1rem, 2.4vw, 1.5rem) 0.85rem;
+  padding: 0.7rem clamp(1rem, 2.4vw, 1.5rem) 0.85rem 0;
   width: 100%;
   box-sizing: border-box;
-  border-top: 1px solid var(--panel-divider);
 }
 .panel-footer .nav-arrow.prev {
   margin-left: 0;
@@ -832,7 +887,7 @@ html, body {
 
   .panel-media {
     min-height: 0;
-    padding: clamp(1rem, 2.4vw, 1.75rem);
+    padding: clamp(1rem, 2.4vw, 1.75rem) clamp(1rem, 2.4vw, 1.75rem) clamp(1rem, 2.4vw, 1.75rem) 10px;
   }
 
   .media-stage {
@@ -840,11 +895,11 @@ html, body {
   }
 
   .panel-header {
-    padding: 1.1rem clamp(1.2rem, 2.8vw, 2rem) 1rem;
+    padding: 1.1rem clamp(1.2rem, 2.8vw, 2rem) 1rem 0;
   }
 
   .panel-body {
-    padding: clamp(1.4rem, 3.5vw, 2.6rem) clamp(1.2rem, 2.8vw, 2rem);
+    padding: clamp(1.4rem, 3.5vw, 2.6rem) clamp(1.2rem, 2.8vw, 2rem) clamp(1.4rem, 3.5vw, 2.6rem) 0;
   }
 
   .caption-wrap {
@@ -852,7 +907,7 @@ html, body {
   }
 
   .panel-footer {
-    padding: 0.78rem clamp(1.2rem, 2.8vw, 2rem) 0.95rem;
+    padding: 0.78rem clamp(1.2rem, 2.8vw, 2rem) 0.95rem 0;
   }
 
 }
