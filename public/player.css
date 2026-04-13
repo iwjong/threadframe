@@ -1,0 +1,530 @@
+/* FREN Frame Player — minimal 2:1 layout */
+:root {
+  --gold: #c9a227;
+  --panel-bg: #f5f2ed;
+  --panel-text: #2c2a26;
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+}
+
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  background: #0a0a0a;
+  color: #fff;
+}
+
+.frame-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #0a0a0a;
+  --ui-text: #2c2a26;
+  --header-row-height: 2.5rem;
+  --icon-size: 1.25rem;
+}
+
+.frame-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.panel-media {
+  flex: 2;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  background: #000;
+}
+
+.media-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.media-wrap img,
+.media-wrap video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Off-screen preload so next media loads in background */
+.media-preload {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.media-preload video,
+.media-preload img {
+  width: 1px;
+  height: 1px;
+}
+
+/* Left: progress bar + time */
+.media-progress {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  color: #fff;
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 0.75rem;
+}
+.media-progress.visible {
+  display: block;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.media-progress.visible.revealed {
+  opacity: 1;
+  pointer-events: auto;
+}
+.media-time-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+  opacity: 0.9;
+}
+.media-time-current,
+.media-time-total {
+  font-variant-numeric: tabular-nums;
+}
+.media-progress-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.media-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #fff;
+  border-radius: 2px;
+  transition: width 0.15s linear;
+}
+
+/* Right panel — header / body / footer */
+.panel-typography {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  transition: background 0.6s ease, color 0.5s ease;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.panel-typography ::-webkit-scrollbar {
+  display: none;
+}
+
+/* Header — unified row height for post-meta and M/S toggles */
+.panel-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  min-height: var(--header-row-height);
+  padding: 0 clamp(0.75rem, 2vw, 1.25rem);
+}
+.post-meta {
+  margin: 0;
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  line-height: var(--header-row-height);
+  color: var(--panel-text);
+  opacity: 0.65;
+  transition: color 0.5s ease, opacity 0.5s ease;
+}
+
+/* Body — fills remaining space, no scroll */
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 clamp(0.75rem, 2vw, 1.25rem);
+  overflow: hidden;
+}
+.caption-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.caption-wrap.visible {
+  opacity: 1;
+}
+.caption-wrap .text {
+  font-family: "Noto Serif KR", serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  /* Prefer no mid-word breaks; only break long words when necessary */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  /* font-size set by JS — prioritizes no overflow, then fills space */
+}
+.caption-wrap .text:empty::before {
+  content: "\00a0";
+  white-space: pre-wrap;
+}
+
+/* Footer — arrows at both ends aligned to panel margin */
+.panel-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: clamp(0.5rem, 1.5vw, 1rem) clamp(0.75rem, 2vw, 1.25rem);
+  width: 100%;
+  box-sizing: border-box;
+}
+.panel-footer .nav-arrow.prev {
+  margin-left: 0;
+  margin-right: auto;
+}
+.panel-footer .nav-arrow.next {
+  margin-left: auto;
+  margin-right: 0;
+}
+.panel-footer .counter {
+  flex-shrink: 0;
+}
+
+.nav-arrow {
+  width: auto;
+  min-width: 28px;
+  height: auto;
+  padding: 0.25rem 0.35rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-arrow .icon-arrow {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: block;
+}
+.nav-arrow:hover {
+  opacity: 0.8;
+}
+.nav-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.counter {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: 0.85rem;
+  font-style: italic;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
+  color: var(--panel-text);
+}
+
+/* Toggles — shuffle, sound (src SVG icons); same row height as header (post-meta) */
+.sound-toggle,
+.random-toggle {
+  position: absolute;
+  top: 0;
+  margin-top: calc(var(--header-row-height, 2.5rem) / 2);
+  transform: translateY(-50%);
+  z-index: 10;
+  border: none;
+  background: transparent;
+  color: var(--ui-text);
+  cursor: pointer;
+  padding: 0.25rem;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.5s ease, opacity 0.2s;
+}
+.sound-toggle svg,
+.random-toggle svg {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: block;
+  position: absolute;
+}
+/* Sound: muted = off icon, unmuted = on icon */
+.sound-toggle .icon-sound-on { display: none; }
+.sound-toggle .icon-sound-off { display: block; }
+.sound-toggle.unmuted .icon-sound-on { display: block; }
+.sound-toggle.unmuted .icon-sound-off { display: none; }
+/* Shuffle: inactive = off icon, active = on icon */
+.random-toggle .icon-shuffle-on { display: none; }
+.random-toggle .icon-shuffle-off { display: block; }
+.random-toggle.active .icon-shuffle-on { display: block; }
+.random-toggle.active .icon-shuffle-off { display: none; }
+.random-toggle .icon-shuffle-on {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+.sound-toggle:hover,
+.random-toggle:hover {
+  opacity: 0.9;
+}
+.sound-toggle {
+  right: 1.25rem;
+}
+.random-toggle {
+  right: 4.5rem;
+}
+
+/* Overlays */
+.loading, .reconnect {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  background: #0a0a0a;
+}
+.loading-card {
+  text-align: center;
+  padding: 2rem;
+}
+.loading-title {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.05em;
+  color: #fff;
+}
+.loading-thread-id {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.6);
+  margin: 0 0 1.25rem;
+  letter-spacing: 0.03em;
+}
+.loading-thread-id span { color: rgba(255,255,255,0.9); }
+.loading-status {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.85);
+  margin: 0 0 0.35rem;
+}
+.loading-detail {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+  margin: 0 0 1.5rem;
+  min-height: 1.2em;
+}
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto;
+  border: 3px solid rgba(255,255,255,0.15);
+  border-top-color: rgba(255,255,255,0.7);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Splash / transition loading — 2–3 slides then content */
+.splash {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+}
+.splash-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.splash-slide.splash-slide-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.splash-title {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  letter-spacing: 0.06em;
+  color: #fff;
+  margin: 0 0 0.75rem;
+}
+.splash-desc {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.6);
+  margin: 0;
+  letter-spacing: 0.03em;
+}
+.splash-version {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: 1rem;
+  color: rgba(255,255,255,0.5);
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.08em;
+}
+
+/* Reconnect / connection issue — card layout aligned with loading */
+.reconnect {
+  background: #0a0a0a;
+}
+.reconnect-card {
+  text-align: center;
+  padding: 2.5rem 2rem;
+  max-width: 22rem;
+}
+.reconnect-icon {
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 1.25rem;
+  color: rgba(255,255,255,0.5);
+}
+.reconnect-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.reconnect-title {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+  letter-spacing: 0.05em;
+  color: #fff;
+  margin: 0 0 0.75rem;
+}
+.reconnect-message {
+  font-family: "Libre Franklin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.7);
+  margin: 0 0 1.5rem;
+  min-height: 1.5em;
+}
+.reconnect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+}
+.reconnect-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1.25rem;
+  font-family: "Libre Franklin", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.reconnect-btn-primary {
+  background: var(--gold);
+  color: #0a0a0a;
+  border: 1px solid var(--gold);
+}
+.reconnect-btn-primary:hover {
+  background: #d4ad2e;
+  color: #0a0a0a;
+  border-color: #d4ad2e;
+}
+.reconnect-btn-secondary {
+  background: transparent;
+  color: rgba(255,255,255,0.9);
+  border: 1px solid rgba(255,255,255,0.35);
+}
+.reconnect-btn-secondary:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border-color: rgba(255,255,255,0.5);
+}
+.empty-state { text-align: center; padding: 2rem; opacity: 0.8; }
