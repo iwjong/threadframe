@@ -3,11 +3,11 @@
  * - Production: HTTPS + custom host for Threads OAuth
  * - Dev mode: HTTP on 127.0.0.1 for local UI work without hosts/cert setup
  */
-import "dotenv/config";
 import http from "http";
 import https from "https";
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 
 function getArgValue(name) {
@@ -21,6 +21,7 @@ function isTruthy(value) {
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, ".env") });
 const DEV_MODE = process.argv.includes("--dev") || isTruthy(process.env.DEV_MODE);
 const APP_ID = process.env.APP_ID;
 const API_SECRET = process.env.API_SECRET;
@@ -36,6 +37,10 @@ const REDIRECT_URI = `https://${HOST}:${PORT}/callback`;
 const THREADS_API_BASE = "https://graph.threads.net";
 const PUBLIC_DIR = path.resolve(__dirname, "public");
 const FETCH_TIMEOUT_MS = 10000;
+const SSL_CA_BUNDLE_FILE = process.env.SSL_CA_BUNDLE_FILE || "/etc/ssl/cert.pem";
+const SSL_CA_BUNDLE = fs.existsSync(SSL_CA_BUNDLE_FILE)
+  ? fs.readFileSync(SSL_CA_BUNDLE_FILE, "utf8")
+  : null;
 
 function getMimeType(ext) {
   const map = {
@@ -93,25 +98,65 @@ function jsonResponse(res, status, body) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    signal: options.signal || AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  const text = await response.text();
-  if (!text) return { response, body: {} };
+  const target = new URL(url);
+  const transport = target.protocol === "https:" ? https : http;
+  const signal = options.signal || AbortSignal.timeout(FETCH_TIMEOUT_MS);
+  const bodyData = options.body instanceof URLSearchParams
+    ? options.body.toString()
+    : options.body;
 
-  try {
-    return { response, body: JSON.parse(text) };
-  } catch {
-    const pathname = new URL(url).pathname;
-    throw new Error(`Invalid JSON from ${pathname}`);
-  }
+  return new Promise((resolve, reject) => {
+    const req = transport.request(
+      target,
+      {
+        method: options.method || "GET",
+        headers: options.headers || {},
+        signal,
+        ...(target.protocol === "https:" && SSL_CA_BUNDLE ? { ca: SSL_CA_BUNDLE } : {}),
+      },
+      (res) => {
+        let text = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => {
+          text += chunk;
+        });
+        res.on("end", () => {
+          const response = {
+            ok: (res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300,
+            status: res.statusCode || 0,
+          };
+          if (!text) {
+            resolve({ response, body: {} });
+            return;
+          }
+
+          try {
+            resolve({ response, body: JSON.parse(text) });
+          } catch {
+            reject(new Error(`Invalid JSON from ${target.pathname}`));
+          }
+        });
+      }
+    );
+
+    req.on("error", reject);
+    req.setTimeout(FETCH_TIMEOUT_MS, () => {
+      req.destroy(new Error("Request timed out"));
+    });
+
+    if (bodyData != null) req.write(bodyData);
+    req.end();
+  });
 }
 
 function getUpstreamStatus(response, error, fallback = 502) {
   if (error?.code === 190) return 401;
   if (response?.status >= 400 && response.status <= 599) return response.status;
   return fallback;
+}
+
+function getErrorDetail(error) {
+  return error?.cause?.code || error?.cause?.message || error?.message || "Unknown error";
 }
 
 function getMissingTokenMessage() {
@@ -163,7 +208,7 @@ async function handleApiPosts(req, res, token) {
     const cursor = body.paging?.cursors?.after ?? null;
     jsonResponse(res, 200, { data: body.data || [], cursor });
   } catch (e) {
-    jsonResponse(res, 502, { error: "Proxy error", detail: e.message });
+    jsonResponse(res, 502, { error: "Proxy error", detail: getErrorDetail(e) });
   }
 }
 
@@ -317,7 +362,7 @@ INITIAL_USER_ID=${userId}</pre><p>Token valid ~${days ?? "unknown"} days.</p><p>
       const value = likesObj?.values?.[0]?.value ?? null;
       jsonResponse(res, 200, { likes: value });
     } catch (e) {
-      jsonResponse(res, 502, { error: "Insights error", detail: e.message });
+      jsonResponse(res, 502, { error: "Insights error", detail: getErrorDetail(e) });
     }
     return;
   }

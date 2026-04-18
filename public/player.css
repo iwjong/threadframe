@@ -233,6 +233,7 @@ html, body {
   display: flex;
   flex-direction: column;
   padding: 0;
+  margin-left: 15px;
   overflow: hidden;
   background: transparent;
   color: var(--panel-text);
