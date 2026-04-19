@@ -5,7 +5,17 @@
 
 ---
 
+## Overview
+
+<p align="center">
+  <img src="reference/sde-threadframe-002.gif" alt="Thread Frame — technical overview diagram" width="720" />
+</p>
+
+---
+
 ## Table of Contents
+
+[Overview](#overview)
 
 1. [Objective](#1-objective)
 2. [Prerequisites](#2-prerequisites)
@@ -514,3 +524,16 @@ Once all items in Section 8 pass, the prototype is validated. Prioritized for v0
 | mkcert (local HTTPS) | https://mkcert.org |
 | Node.js Download | https://nodejs.org/en/download |
 | Thread Frame README | See `README.md` in project root |
+
+---
+
+## 13. Example Screenshots
+
+<p align="center">
+  <img src="reference/sde-threadframe-001.jpg" alt="Thread Frame usage example 1" width="720" /><br /><br />
+  <img src="reference/sde-threadframe-003.jpg" alt="Thread Frame usage example 3" width="720" /><br /><br />
+  <img src="reference/sde-threadframe-004.jpg" alt="Thread Frame usage example 4" width="720" /><br /><br />
+  <img src="reference/sde-threadframe-005.jpg" alt="Thread Frame usage example 5" width="720" /><br /><br />
+  <img src="reference/sde-threadframe-006.jpg" alt="Thread Frame usage example 6" width="720" /><br /><br />
+  <img src="reference/sde-threadframe-007.jpg" alt="Thread Frame usage example 7" width="720" />
+</p>
