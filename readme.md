@@ -532,7 +532,7 @@ Once all items in Section 8 pass, the prototype is validated. Prioritized for v0
 <p align="center">
   <img src="reference/sde-threadframe-001.jpg" alt="Thread Frame usage example 1" width="720" /><br /><br />
   <img src="reference/sde-threadframe-003.jpg" alt="Thread Frame usage example 3" width="720" /><br /><br />
-  <img src="reference/sde-threadframe-004.jpg" alt="Thread Frame usage example 4" width="720" /><br /><br />
+  <img src="reference/sde-threadframe-004.jpg" alt="Thread Frame usage example 4" width="420" /><br /><br />
   <img src="reference/sde-threadframe-005.jpg" alt="Thread Frame usage example 5" width="720" /><br /><br />
   <img src="reference/sde-threadframe-006.jpg" alt="Thread Frame usage example 6" width="720" /><br /><br />
   <img src="reference/sde-threadframe-007.jpg" alt="Thread Frame usage example 7" width="720" />
