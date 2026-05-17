@@ -567,8 +567,10 @@ Tokens are **not** shown in the browser after OAuth.
 
 ### 14.4 Render (quick start)
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/iwjong/threadframe)
+
 1. Push the repo to GitHub.
-2. Create a **New Web Service** on Render and connect the repo (or use **Blueprint** with `render.yaml`).
+2. Click **Deploy to Render** above (or **New → Blueprint** in the Render dashboard) and select `iwjong/threadframe`.
 3. Set `PUBLIC_URL` to the Render URL (or your custom domain).
 4. Fill `APP_ID`, `API_SECRET`, `VIEWER_PASSWORD`, and keep generated `SESSION_SECRET` / `ADMIN_SETUP_KEY`.
 5. Deploy, then run the OAuth URL from §14.3.
