@@ -74,20 +74,34 @@ if (-not $viewerPassword) {
   Write-Host "Generated VIEWER_PASSWORD (save this): $viewerPassword"
 }
 
-$payload = @(
-  @{ envVar = @{ key = "APP_ID"; value = $local["APP_ID"] } } },
-  @{ envVar = @{ key = "API_SECRET"; value = $local["API_SECRET"] } } },
-  @{ envVar = @{ key = "VIEWER_PASSWORD"; value = $viewerPassword } } },
-  @{ envVar = @{ key = "NODE_ENV"; value = "production" } } },
-  @{ envVar = @{ key = "TRUST_PROXY"; value = "true" } } }
-)
+$updates = [ordered]@{
+  APP_ID            = $local["APP_ID"]
+  API_SECRET        = $local["API_SECRET"]
+  VIEWER_PASSWORD   = $viewerPassword
+  NODE_ENV          = "production"
+  TRUST_PROXY       = "true"
+}
 
 if ($local["INITIAL_ACCESS_TOKEN"] -and $local["INITIAL_ACCESS_TOKEN"] -ne "your_long_lived_token") {
-  $payload += @{ envVar = @{ key = "INITIAL_ACCESS_TOKEN"; value = $local["INITIAL_ACCESS_TOKEN"] } } }
+  $updates["INITIAL_ACCESS_TOKEN"] = $local["INITIAL_ACCESS_TOKEN"]
 }
 if ($local["INITIAL_USER_ID"]) {
-  $payload += @{ envVar = @{ key = "INITIAL_USER_ID"; value = $local["INITIAL_USER_ID"] } } }
+  $updates["INITIAL_USER_ID"] = $local["INITIAL_USER_ID"]
 }
+
+Write-Host "Loading existing Render env vars..."
+$existing = Invoke-RenderApi -Method GET -Uri "https://api.render.com/v1/services/$ServiceId/env-vars?limit=100"
+$merged = @{}
+foreach ($item in $existing) {
+  $merged[$item.envVar.key] = $item.envVar.value
+}
+foreach ($entry in $updates.GetEnumerator()) {
+  if ($entry.Value) { $merged[$entry.Key] = $entry.Value }
+}
+
+$payload = @($merged.GetEnumerator() | ForEach-Object {
+  @{ envVar = @{ key = $_.Key; value = [string]$_.Value } }
+})
 
 Write-Host "Updating env vars on $ServiceId ..."
 Invoke-RenderApi -Method PUT -Uri "https://api.render.com/v1/services/$ServiceId/env-vars" -Body $payload | Out-Null
