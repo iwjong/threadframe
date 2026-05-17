@@ -15,6 +15,15 @@ import * as THREE from "/vendor/three.module.js";
   const DEFAULT_PANEL_BG = "#f5f2ed";
   const DEFAULT_PANEL_TEXT = "#2c2a26";
 
+  function apiFetch(url, options = {}) {
+    return fetch(url, { credentials: "same-origin", ...options });
+  }
+
+  function handleViewerAuthRequired() {
+    const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.replace("/login.html?return=" + returnTo);
+  }
+
   /* Contrast-aware palette pool for varied but readable panel combinations */
   const BACKGROUNDS = [
     { hex: "#ffb6c1", name: "Pink" },
@@ -985,10 +994,16 @@ import * as THREE from "/vendor/three.module.js";
     displayedPostId = id;
     renderPostMeta(dateStr, null);
     if (!id) return;
-    fetch("/api/insights?id=" + encodeURIComponent(id))
-      .then((res) => res.json())
+    apiFetch("/api/insights?id=" + encodeURIComponent(id))
+      .then((res) => {
+        if (res.status === 403) {
+          handleViewerAuthRequired();
+          return null;
+        }
+        return res.json();
+      })
       .then((data) => {
-        if (displayedPostId !== id) return;
+        if (!data || displayedPostId !== id) return;
         const likes = data.likes != null ? Number(data.likes) : null;
         renderPostMeta(dateStr, likes);
       })
@@ -1355,7 +1370,11 @@ import * as THREE from "/vendor/three.module.js";
     if (loadingMore || !nextCursor) return false;
     loadingMore = true;
     try {
-      const res = await fetch("/api/posts?limit=20&cursor=" + encodeURIComponent(nextCursor));
+      const res = await apiFetch("/api/posts?limit=20&cursor=" + encodeURIComponent(nextCursor));
+      if (res.status === 403) {
+        handleViewerAuthRequired();
+        return false;
+      }
       const data = await res.json();
       if (!res.ok || !Array.isArray(data.data)) return false;
       const newItems = data.data.filter((p) => getMediaUrl(p));
@@ -1458,12 +1477,16 @@ import * as THREE from "/vendor/three.module.js";
         const url = cursor
           ? "/api/posts?limit=50&cursor=" + encodeURIComponent(cursor)
           : "/api/posts?limit=50";
-        const res = await fetch(url);
+        const res = await apiFetch(url);
         const data = await res.json();
         if (!res.ok) {
+          if (res.status === 403 && data.code === "VIEWER_AUTH_REQUIRED") {
+            handleViewerAuthRequired();
+            return;
+          }
           if (res.status === 401) {
             showLoading(false);
-            showReconnect(true, data.error || "No token or expired.");
+            showReconnect(true, data.error || "Threads is not connected.");
             return;
           }
           throw new Error(data.error || "API error");

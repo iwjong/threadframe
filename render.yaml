@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: threadframe
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start:prod
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      # Optional override; Render sets RENDER_EXTERNAL_URL automatically
+      - key: PUBLIC_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_ID
+        sync: false
+      - key: API_SECRET
+        sync: false
+      - key: VIEWER_PASSWORD
+        sync: false
+      - key: ADMIN_SETUP_KEY
+        generateValue: true
+      - key: INITIAL_ACCESS_TOKEN
+        sync: false

@@ -29,6 +29,7 @@
 10. [Token Maintenance](#10-token-maintenance)
 11. [Next Steps After Successful Testing](#11-next-steps-after-successful-testing)
 12. [Reference](#12-reference)
+14. [Public Web Deployment](#14-public-web-deployment)
 
 ---
 
@@ -38,12 +39,14 @@ This guide walks through every step required to connect the FREN Frame prototype
 
 > **Prototype Goal:** Validate the full data pipeline — Threads API → backend proxy → Frame Player UI — using real account content. No new features are added during this phase.
 
-### Security First (Public Repo)
+### Security First (Public Repo & Public Web)
 
-- Keep real credentials and tokens in local `.env` only.
+- Keep real credentials and tokens in **hosting environment variables** or encrypted `data/` (gitignored) — never in Git.
+- `API_SECRET`, `INITIAL_ACCESS_TOKEN`, and `SESSION_SECRET` stay **server-side only**; the browser never receives them.
+- Set `VIEWER_PASSWORD` on public deployments so `/api/*` cannot be scraped anonymously.
+- Use `ADMIN_SETUP_KEY` so only you can open `/auth?key=...` to connect Threads.
 - Keep local cert/key files out of Git.
 - Keep private notes in `docs/private/` (excluded by `.gitignore`).
-- Keep shareable docs in `docs/public/`.
 
 ---
 
@@ -524,6 +527,57 @@ Once all items in Section 8 pass, the prototype is validated. Prioritized for v0
 | mkcert (local HTTPS) | https://mkcert.org |
 | Node.js Download | https://nodejs.org/en/download |
 | Thread Frame README | See `README.md` in project root |
+
+---
+
+## 14. Public Web Deployment
+
+Deploy the Node server to any host that provides HTTPS (Render, Railway, Fly.io, VPS). The repo includes `render.yaml` as a starting point.
+
+### 14.1 Required environment variables
+
+| Variable | Purpose |
+|---|---|
+| `NODE_ENV` | Set to `production` on the host |
+| `PUBLIC_URL` | Public HTTPS origin, e.g. `https://threadframe.onrender.com` (no trailing slash) |
+| `SESSION_SECRET` | Random string ≥ 32 chars — signs viewer cookies and encrypts stored tokens |
+| `APP_ID` | Threads-specific App ID |
+| `API_SECRET` | Threads-specific App Secret |
+| `VIEWER_PASSWORD` | **Recommended** — visitors enter this on `/login.html` before viewing |
+| `ADMIN_SETUP_KEY` | **Recommended** — required as `?key=` on `/auth` in production |
+
+Optional: `INITIAL_ACCESS_TOKEN` if you already have a long-lived token (otherwise use OAuth once).
+
+### 14.2 Meta app redirect URL
+
+In **Meta App Dashboard → Threads API → Redirect Callback URLs**, add:
+
+```
+https://YOUR-PUBLIC-URL/callback
+```
+
+### 14.3 Connect Threads (owner, one time)
+
+1. Deploy with the variables above.
+2. Open `https://YOUR-PUBLIC-URL/auth?key=YOUR_ADMIN_SETUP_KEY`
+3. Complete Meta OAuth — the token is saved encrypted under `data/` (or set `INITIAL_ACCESS_TOKEN` in the host dashboard if the filesystem is ephemeral).
+4. Open `https://YOUR-PUBLIC-URL/` — enter `VIEWER_PASSWORD` when prompted.
+
+Tokens are **not** shown in the browser after OAuth.
+
+### 14.4 Render (quick start)
+
+1. Push the repo to GitHub.
+2. Create a **New Web Service** on Render and connect the repo (or use **Blueprint** with `render.yaml`).
+3. Set `PUBLIC_URL` to the Render URL (or your custom domain).
+4. Fill `APP_ID`, `API_SECRET`, `VIEWER_PASSWORD`, and keep generated `SESSION_SECRET` / `ADMIN_SETUP_KEY`.
+5. Deploy, then run the OAuth URL from §14.3.
+
+### 14.5 What stays secret
+
+| Never in Git / client | Safe to be public |
+|---|---|
+| `API_SECRET`, `INITIAL_ACCESS_TOKEN`, `SESSION_SECRET`, `VIEWER_PASSWORD`, `ADMIN_SETUP_KEY` | `APP_ID`, UI static files, `/api/status` (no tokens) |
 
 ---
 
