@@ -1,4 +1,4 @@
-import * as THREE from "/vendor/three.module.js";
+import * as THREE from "./vendor/three.module.js";
 
 /**
  * FREN Frame Player — 2:1 magazine layout, color extraction, counter, arrows, random.
@@ -15,13 +15,22 @@ import * as THREE from "/vendor/three.module.js";
   const DEFAULT_PANEL_BG = "#f5f2ed";
   const DEFAULT_PANEL_TEXT = "#2c2a26";
 
+  const cfg = window.__THREADFRAME__ || { base: "/", static: false };
+  const BASE = cfg.base.endsWith("/") ? cfg.base : `${cfg.base}/`;
+  const STATIC = Boolean(cfg.static);
+  let staticInsights = {};
+
   function apiFetch(url, options = {}) {
     return fetch(url, { credentials: "same-origin", ...options });
   }
 
+  function assetUrl(relativePath) {
+    return BASE + String(relativePath || "").replace(/^\//, "");
+  }
+
   function handleViewerAuthRequired() {
     const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-    window.location.replace("/login.html?return=" + returnTo);
+    window.location.replace(assetUrl("login.html?return=" + returnTo));
   }
 
   /* Contrast-aware palette pool for varied but readable panel combinations */
@@ -992,6 +1001,13 @@ import * as THREE from "/vendor/three.module.js";
     const dateStr = formatPostDate(post.timestamp);
     const id = post.id;
     displayedPostId = id;
+    if (STATIC) {
+      const likes = id && Object.prototype.hasOwnProperty.call(staticInsights, id)
+        ? staticInsights[id]
+        : null;
+      renderPostMeta(dateStr, likes);
+      return;
+    }
     renderPostMeta(dateStr, null);
     if (!id) return;
     apiFetch("/api/insights?id=" + encodeURIComponent(id))
@@ -1367,7 +1383,7 @@ import * as THREE from "/vendor/three.module.js";
   }
 
   async function loadMorePosts() {
-    if (loadingMore || !nextCursor) return false;
+    if (STATIC || loadingMore || !nextCursor) return false;
     loadingMore = true;
     try {
       const res = await apiFetch("/api/posts?limit=20&cursor=" + encodeURIComponent(nextCursor));
@@ -1455,7 +1471,107 @@ import * as THREE from "/vendor/three.module.js";
     }, 150);
   });
 
+  async function launchWithPosts(all, insightsMap) {
+    staticInsights = insightsMap || {};
+    updateLoadingStatus("Preparing your thread…");
+    updateLoadingDetail("Filtering posts with media");
+    bumpLoadingProgress(90);
+    posts = all.filter((p) => getMediaUrl(p));
+    nextCursor = null;
+
+    if (posts.length === 0) {
+      await finishLoadingProgress();
+      showLoading(false);
+      media3DStage?.clear();
+      el.mediaWrap.innerHTML = '<div class="empty-state">No posts with media.</div>';
+      if (el.postMeta) el.postMeta.textContent = "";
+      updateCounter();
+      return;
+    }
+    index = posts.length > 1 ? Math.floor(Math.random() * posts.length) : 0;
+    const firstPost = posts[index];
+    const firstUrl = getMediaUrl(firstPost);
+    const firstIsVid = isVideo(firstPost);
+
+    media3DStage?.clear();
+    if (el.mediaWrap) el.mediaWrap.innerHTML = "";
+    if (el.mediaPreload) el.mediaPreload.innerHTML = "";
+
+    let firstMediaReady = Promise.resolve();
+    if (firstIsVid) {
+      const video = document.createElement("video");
+      video.crossOrigin = "anonymous";
+      video.src = firstUrl;
+      const posterUrl = getVideoPoster(firstPost);
+      if (posterUrl) video.poster = posterUrl;
+      video.preload = "auto";
+      video.muted = !soundOn;
+      if (!soundOn) video.setAttribute("muted", "");
+      video.playsInline = true;
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+      if (el.mediaPreload) el.mediaPreload.appendChild(video);
+      firstMediaReady = new Promise((resolve) => {
+        video.addEventListener("canplay", () => resolve(), { once: true });
+        video.addEventListener("error", () => resolve(), { once: true });
+      });
+    } else {
+      const img = document.createElement("img");
+      img.crossOrigin = "anonymous";
+      img.alt = firstPost.alt_text || firstPost.text || "";
+      if (el.mediaPreload) el.mediaPreload.appendChild(img);
+      firstMediaReady = new Promise((resolve) => {
+        img.addEventListener("load", () => resolve(), { once: true });
+        img.addEventListener("error", () => resolve(), { once: true });
+        img.src = firstUrl;
+      });
+    }
+
+    updateLoadingStatus("Finalizing launch...");
+    updateLoadingDetail("Preparing first frame");
+    bumpLoadingProgress(96);
+    await firstMediaReady;
+    updateLoadingStatus("Ready");
+    updateLoadingDetail("Opening Threadframe");
+    await finishLoadingProgress();
+    showLoading(false);
+    showSplash(true);
+    runLaunchSplashThenShowPost(() => showPost());
+  }
+
+  async function fetchPostsStatic() {
+    showReconnect(false);
+    showSplash(false);
+    showLoading(true);
+    startLoadingProgress();
+    updateLoadingStatus("Loading thread archive…");
+    updateLoadingDetail("Reading posts.json");
+    try {
+      const res = await fetch(assetUrl("data/posts.json"), { cache: "no-store" });
+      if (!res.ok) throw new Error("posts.json not found (" + res.status + ")");
+      const data = await res.json();
+      const all = Array.isArray(data.posts) ? data.posts : [];
+      const generatedAt = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "";
+      if (generatedAt) {
+        updateLoadingDetail("Snapshot from " + generatedAt);
+      }
+      bumpLoadingProgress(70);
+      await launchWithPosts(all, data.insights || {});
+    } catch (err) {
+      showLoading(false);
+      const hint = STATIC
+        ? "Run the GitHub Actions workflow (Pages) or check THREADS_ACCESS_TOKEN secret."
+        : (err.message || "");
+      showReconnect(true, "Could not load posts. " + hint);
+    }
+  }
+
   async function fetchPosts() {
+    if (STATIC) {
+      await fetchPostsStatic();
+      return;
+    }
+
     showReconnect(false);
     showSplash(false);
     showLoading(true);
@@ -1499,78 +1615,20 @@ import * as THREE from "/vendor/three.module.js";
         updateLoadingDetail(all.length + " posts received" + (cursor ? " - loading next batch..." : " - preparing launch"));
       } while (cursor);
 
-      updateLoadingStatus("Preparing your thread…");
-      updateLoadingDetail("Filtering posts with media");
-      updateLoadingStatus("Preparing your thread...");
-      bumpLoadingProgress(90);
-      posts = all.filter((p) => getMediaUrl(p));
-      nextCursor = null;
-
-      if (posts.length === 0) {
-        await finishLoadingProgress();
-        showLoading(false);
-        media3DStage?.clear();
-        el.mediaWrap.innerHTML = '<div class="empty-state">No posts with media.</div>';
-        if (el.postMeta) el.postMeta.textContent = "";
-        updateCounter();
-        return;
-      }
-      index = posts.length > 1 ? Math.floor(Math.random() * posts.length) : 0;
-      const firstPost = posts[index];
-      const firstUrl = getMediaUrl(firstPost);
-      const firstIsVid = isVideo(firstPost);
-
-      /* Do not show any real thread content during load. Preload first media off-screen only. */
-      media3DStage?.clear();
-      if (el.mediaWrap) el.mediaWrap.innerHTML = "";
-      if (el.mediaPreload) el.mediaPreload.innerHTML = "";
-
-      let firstMediaReady = Promise.resolve();
-      if (firstIsVid) {
-        const video = document.createElement("video");
-        video.crossOrigin = "anonymous";
-        video.src = firstUrl;
-        const posterUrl = getVideoPoster(firstPost);
-        if (posterUrl) video.poster = posterUrl;
-        video.preload = "auto";
-        video.muted = !soundOn;
-        if (!soundOn) video.setAttribute("muted", "");
-        video.playsInline = true;
-        video.setAttribute("playsinline", "");
-        video.setAttribute("webkit-playsinline", "");
-        if (el.mediaPreload) el.mediaPreload.appendChild(video);
-        firstMediaReady = new Promise((resolve) => {
-          video.addEventListener("canplay", () => resolve(), { once: true });
-          video.addEventListener("error", () => resolve(), { once: true });
-        });
-      } else {
-        const img = document.createElement("img");
-        img.crossOrigin = "anonymous";
-        img.alt = firstPost.alt_text || firstPost.text || "";
-        if (el.mediaPreload) el.mediaPreload.appendChild(img);
-        firstMediaReady = new Promise((resolve) => {
-          img.addEventListener("load", () => resolve(), { once: true });
-          img.addEventListener("error", () => resolve(), { once: true });
-          img.src = firstUrl;
-        });
-      }
-
-      updateLoadingStatus("Finalizing launch...");
-      updateLoadingDetail("Preparing first frame");
-      bumpLoadingProgress(96);
-      await firstMediaReady;
-      updateLoadingStatus("Ready");
-      updateLoadingDetail("Opening Threadframe");
-      await finishLoadingProgress();
-      showLoading(false);
-      showSplash(true);
-      runLaunchSplashThenShowPost(() => showPost());
+      await launchWithPosts(all, {});
       return;
 
     } catch (err) {
       showLoading(false);
       showReconnect(true, "Could not load posts. " + (err.message || ""));
     }
+  }
+
+  if (STATIC) {
+    const authLink = document.getElementById("reconnect-auth");
+    const rebuildLink = document.getElementById("reconnect-rebuild");
+    if (authLink) authLink.hidden = true;
+    if (rebuildLink) rebuildLink.hidden = false;
   }
 
   fetchPosts();

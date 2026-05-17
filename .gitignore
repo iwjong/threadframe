@@ -12,4 +12,5 @@ node_modules/
 *.err
 .DS_Store
 docs/private/
-data/
+data/*
+!data/.gitkeep

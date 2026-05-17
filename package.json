@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "start:prod": "node server.js",
-    "dev": "node server.js --dev"
+    "dev": "node server.js --dev",
+    "fetch:posts": "node scripts/fetch-posts.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

@@ -30,6 +30,7 @@
 11. [Next Steps After Successful Testing](#11-next-steps-after-successful-testing)
 12. [Reference](#12-reference)
 14. [Public Web Deployment](#14-public-web-deployment)
+15. [GitHub Pages (static, free)](#15-github-pages-static-free)
 
 ---
 
@@ -580,6 +581,45 @@ Tokens are **not** shown in the browser after OAuth.
 | Never in Git / client | Safe to be public |
 |---|---|
 | `API_SECRET`, `INITIAL_ACCESS_TOKEN`, `SESSION_SECRET`, `VIEWER_PASSWORD`, `ADMIN_SETUP_KEY` | `APP_ID`, UI static files, `/api/status` (no tokens) |
+
+---
+
+## 15. GitHub Pages (static, free)
+
+Host the Frame Player at **`https://iwjong.github.io/threadframe/`** with no Node server. Threads data is fetched by GitHub Actions and saved as `data/posts.json` (twice daily + on every push to `main`).
+
+### 15.1 One-time setup
+
+1. **Repository secret** (Settings → Secrets and variables → Actions):
+   - Name: `THREADS_ACCESS_TOKEN`
+   - Value: your long-lived Threads token (same as `INITIAL_ACCESS_TOKEN` in local `.env`)
+
+2. **GitHub Pages** (Settings → Pages):
+   - **Source:** GitHub Actions (not Jekyll branch)
+
+3. Push to `main` — workflow **GitHub Pages (static)** runs automatically.
+
+4. Open: https://iwjong.github.io/threadframe/
+
+### 15.2 Refresh posts
+
+- Automatic: schedule in `.github/workflows/pages.yml` (08:00 and 20:00 UTC)
+- Manual: Actions → **GitHub Pages (static)** → **Run workflow**
+
+### 15.3 Local static preview
+
+```bash
+npm run fetch:posts   # needs INITIAL_ACCESS_TOKEN or THREADS_ACCESS_TOKEN in .env
+npx serve public -p 4173
+```
+
+Copy `data/posts.json` into `public/data/`, then open `http://localhost:4173` with `public/config.js` set to `{ base: "/", static: true }` for a quick check.
+
+### 15.4 Limits
+
+- Not live — updates when the workflow runs
+- OAuth / viewer password not used on Pages (public gallery)
+- Do not commit real tokens; only the GitHub secret
 
 ---
 
