@@ -26,9 +26,23 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install dependencies
+        run: npm install
+
+      - name: Verify Threads token secret
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          INITIAL_ACCESS_TOKEN: ${{ secrets.INITIAL_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$THREADS_ACCESS_TOKEN" ] && [ -z "$INITIAL_ACCESS_TOKEN" ]; then
+            echo "::error::Repository secret missing. Add THREADS_ACCESS_TOKEN (recommended) or INITIAL_ACCESS_TOKEN under Settings → Secrets and variables → Actions, then re-run this workflow."
+            exit 1
+          fi
+
       - name: Fetch Threads data
         env:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          INITIAL_ACCESS_TOKEN: ${{ secrets.INITIAL_ACCESS_TOKEN }}
           FETCH_INSIGHTS: "true"
         run: node scripts/fetch-posts.mjs
 

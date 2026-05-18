@@ -590,9 +590,10 @@ Host the Frame Player at **`https://iwjong.github.io/threadframe/`** with no Nod
 
 ### 15.1 One-time setup
 
-1. **Repository secret** (Settings → Secrets and variables → Actions):
-   - Name: `THREADS_ACCESS_TOKEN`
-   - Value: your long-lived Threads token (same as `INITIAL_ACCESS_TOKEN` in local `.env`)
+1. **Repository secret** (repo **Settings → Secrets and variables → Actions → New repository secret**):
+   - Name: `THREADS_ACCESS_TOKEN` (or `INITIAL_ACCESS_TOKEN` — same value either way)
+   - Value: long-lived token — copy **`INITIAL_ACCESS_TOKEN`** from your local `.env` (no quotes, no spaces)
+   - Must be under **Actions** secrets, not Codespaces or Dependabot
 
 2. **GitHub Pages** (Settings → Pages):
    - **Source:** GitHub Actions (not Jekyll branch)

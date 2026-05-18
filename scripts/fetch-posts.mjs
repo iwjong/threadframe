@@ -1,13 +1,17 @@
 /**
  * Fetch Threads posts for GitHub Pages static deploy.
- * Env: THREADS_ACCESS_TOKEN (required), FETCH_INSIGHTS=true (optional)
+ * Env: THREADS_ACCESS_TOKEN or INITIAL_ACCESS_TOKEN (required)
+ * Local: loads .env from project root when present.
  */
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
+dotenv.config({ path: path.join(ROOT, ".env") });
+
 const OUT_DIR = path.join(ROOT, "data");
 const OUT_FILE = path.join(OUT_DIR, "posts.json");
 const THREADS_API_BASE = "https://graph.threads.net";
@@ -15,10 +19,21 @@ const MAX_PAGES = 30;
 const PAGE_LIMIT = 50;
 const FETCH_INSIGHTS = /^(1|true|yes)$/i.test(process.env.FETCH_INSIGHTS || "true");
 const INSIGHT_DELAY_MS = 120;
+const PLACEHOLDER = "your_long_lived_token";
 
-const token = process.env.THREADS_ACCESS_TOKEN || process.env.INITIAL_ACCESS_TOKEN;
-if (!token || token === "your_long_lived_token") {
-  console.error("Set THREADS_ACCESS_TOKEN (GitHub secret) or INITIAL_ACCESS_TOKEN in the environment.");
+function resolveToken() {
+  return process.env.THREADS_ACCESS_TOKEN || process.env.INITIAL_ACCESS_TOKEN || "";
+}
+
+const token = resolveToken().trim();
+if (!token || token === PLACEHOLDER) {
+  console.error("Missing Threads access token.");
+  console.error("");
+  console.error("GitHub Actions: add a repository secret (Settings → Secrets → Actions):");
+  console.error("  Name:  THREADS_ACCESS_TOKEN  (or INITIAL_ACCESS_TOKEN)");
+  console.error("  Value: long-lived token from Meta (same as local .env INITIAL_ACCESS_TOKEN)");
+  console.error("");
+  console.error("Local: set INITIAL_ACCESS_TOKEN in .env, then run: npm run fetch:posts");
   process.exit(1);
 }
 
