@@ -1,0 +1,3 @@
+#!/bin/sh
+# Prevent Cursor from appearing as a GitHub contributor.
+node "$(dirname "$0")/../scripts/strip-cursor-from-commit-msg.mjs" "$1" || exit 0
