@@ -21,19 +21,61 @@ const FETCH_INSIGHTS = /^(1|true|yes)$/i.test(process.env.FETCH_INSIGHTS || "tru
 const INSIGHT_DELAY_MS = 120;
 const PLACEHOLDER = "your_long_lived_token";
 
-function resolveToken() {
-  return process.env.THREADS_ACCESS_TOKEN || process.env.INITIAL_ACCESS_TOKEN || "";
+function normalizeAccessToken(raw) {
+  if (!raw) return "";
+  let token = String(raw).replace(/^\uFEFF/, "").trim();
+
+  if (/^(INITIAL_ACCESS_TOKEN|THREADS_ACCESS_TOKEN)\s*=/i.test(token)) {
+    token = token.replace(/^(INITIAL_ACCESS_TOKEN|THREADS_ACCESS_TOKEN)\s*=/i, "").trim();
+  }
+
+  token = token.replace(/^Bearer\s+/i, "").trim();
+
+  if (
+    (token.startsWith('"') && token.endsWith('"')) ||
+    (token.startsWith("'") && token.endsWith("'"))
+  ) {
+    token = token.slice(1, -1).trim();
+  }
+
+  // Strip line breaks / spaces from copy-paste (token must be one continuous string).
+  token = token.replace(/\s+/g, "");
+  return token;
 }
 
-const token = resolveToken().trim();
-if (!token || token === PLACEHOLDER) {
-  console.error("Missing Threads access token.");
+function validateToken(token) {
+  if (!token || token === PLACEHOLDER) return "missing";
+  if (token.length < 40) return "too_short";
+  if (/^your_/i.test(token)) return "placeholder";
+  if (/^[0-9]+$/.test(token)) return "user_id_not_token";
+  if (token.includes("=")) return "env_line_or_wrong_value";
+  return null;
+}
+
+function printTokenHelp(issue) {
+  console.error("Threads access token is invalid (%s).", issue);
   console.error("");
-  console.error("GitHub Actions: add a repository secret (Settings → Secrets → Actions):");
-  console.error("  Name:  THREADS_ACCESS_TOKEN  (or INITIAL_ACCESS_TOKEN)");
-  console.error("  Value: long-lived token from Meta (same as local .env INITIAL_ACCESS_TOKEN)");
+  console.error("GitHub secret value must be ONLY the token string, for example:");
+  console.error("  THAAxxxxxxxx...  (from INITIAL_ACCESS_TOKEN in local .env)");
   console.error("");
-  console.error("Local: set INITIAL_ACCESS_TOKEN in .env, then run: npm run fetch:posts");
+  console.error("Do NOT paste:");
+  console.error("  - API_SECRET or APP_ID");
+  console.error("  - The whole line INITIAL_ACCESS_TOKEN=...");
+  console.error("  - Quotes, 'Bearer ', or line breaks");
+  console.error("");
+  console.error("Update: Settings → Secrets → Actions → THREADS_ACCESS_TOKEN → Update");
+}
+
+function resolveToken() {
+  return normalizeAccessToken(
+    process.env.THREADS_ACCESS_TOKEN || process.env.INITIAL_ACCESS_TOKEN || ""
+  );
+}
+
+const token = resolveToken();
+const tokenIssue = validateToken(token);
+if (tokenIssue) {
+  printTokenHelp(tokenIssue);
   process.exit(1);
 }
 
@@ -52,7 +94,12 @@ async function fetchJson(url, options = {}) {
     }
   }
   if (!res.ok || body.error) {
-    throw new Error(body.error?.message || `HTTP ${res.status} for ${url}`);
+    const message = body.error?.message || `HTTP ${res.status} for ${url}`;
+    if (/cannot parse access token/i.test(message) || body.error?.code === 190) {
+      printTokenHelp("rejected_by_threads_api");
+      process.exit(1);
+    }
+    throw new Error(message);
   }
   return body;
 }
