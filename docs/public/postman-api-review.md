@@ -1,7 +1,7 @@
 # Threads API Postman Collection Review and Step-by-Step Guide (Public)
 
 > **Postman Collection (Official):** [Meta Threads API](https://www.postman.com/meta/threads/collection/dht3nzz/threads-api?action=share&source=copy-link&creator=52848147)  
-> **Official Docs:** [Threads API — Tools and Resources](https://developers.facebook.com/docs/threads/tools-and-resources)
+> **Official Docs:** [Threads API: Tools and Resources](https://developers.facebook.com/docs/threads/tools-and-resources)
 
 ---
 

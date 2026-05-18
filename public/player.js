@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.js";
 
 /**
- * FREN Frame Player — 2:1 magazine layout, color extraction, counter, arrows, random.
+ * FREN Frame Player: 2:1 magazine layout, color extraction, counter, arrows, random.
  */
 (function () {
   const DURATION_MS = 7000;
@@ -1223,7 +1223,7 @@ import * as THREE from "./vendor/three.module.js";
     const hadContent = el.mediaWrap && el.mediaWrap.children.length > 0;
 
     if (!hadContent) {
-      /* First load: media already preloaded during loading screen — show and play immediately */
+      /* First load: media already preloaded during loading screen; show and play immediately */
       clearTimers();
       setPanelPatternForPost(post);
       applyRandomPalette();
@@ -1586,7 +1586,7 @@ import * as THREE from "./vendor/three.module.js";
       do {
         page++;
         updateLoadingStatus("Fetching your posts…");
-        updateLoadingDetail(page === 1 ? "Requesting first page" : "Page " + page + " — " + all.length + " so far");
+        updateLoadingDetail(page === 1 ? "Requesting first page" : "Page " + page + ", " + all.length + " so far");
 
         updateLoadingStatus("Fetching your posts...");
         updateLoadingDetail(page === 1 ? "Requesting first page" : "Loading page " + page + " - " + all.length + " collected");

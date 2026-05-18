@@ -613,9 +613,9 @@ function start() {
     if (config.publicWeb) {
       console.log("Public web mode: TLS expected from hosting proxy.");
       if (config.viewerPassword) console.log("Viewer password gate: enabled.");
-      else console.warn("VIEWER_PASSWORD is not set — /api routes are open to anyone.");
+      else console.warn("VIEWER_PASSWORD is not set; /api routes are open to anyone.");
       if (config.adminSetupKey) console.log("Admin setup key required for /auth.");
-      else console.warn("ADMIN_SETUP_KEY is not set — /auth is open to anyone.");
+      else console.warn("ADMIN_SETUP_KEY is not set; /auth is open to anyone.");
     }
     if (tokenStore.hasToken()) {
       console.log("Threads token available.");

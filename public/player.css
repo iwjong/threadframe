@@ -1,4 +1,4 @@
-/* FREN Frame Player — minimal 2:1 layout */
+/* FREN Frame Player : minimal 2:1 layout */
 :root {
   --gold: #c9a227;
   --panel-bg: #f5f2ed;
@@ -224,7 +224,7 @@ html, body {
   transition: width 0.15s linear;
 }
 
-/* Right panel — header / body / footer */
+/* Right panel : header / body / footer */
 .panel-typography {
   position: relative;
   isolation: isolate;
@@ -285,7 +285,7 @@ html, body {
   display: none;
 }
 
-/* Header — unified row height for post-meta and M/S toggles */
+/* Header : unified row height for post-meta and M/S toggles */
 .panel-header {
   flex-shrink: 0;
   position: relative;
@@ -351,7 +351,7 @@ html, body {
   transition: color 0.5s ease, opacity 0.2s ease;
 }
 
-/* Body — fills remaining space, no scroll */
+/* Body : fills remaining space, no scroll */
 .panel-body {
   flex: 1;
   min-height: 0;
@@ -413,7 +413,7 @@ html, body {
   padding: 0;
   text-wrap: pretty;
   text-rendering: optimizeLegibility;
-  /* font-size set by JS — prioritizes no overflow, then fills space */
+  /* font-size set by JS : prioritizes no overflow, then fills space */
 }
 .caption-wrap .text[data-density="short"] {
   max-width: min(100%, 14.75ch);
@@ -444,7 +444,7 @@ html, body {
   white-space: pre-wrap;
 }
 
-/* Footer — arrows at both ends aligned to panel margin */
+/* Footer : arrows at both ends aligned to panel margin */
 .panel-footer {
   flex-shrink: 0;
   position: relative;
@@ -512,7 +512,7 @@ html, body {
   text-transform: uppercase;
 }
 
-/* Toggles — shuffle, sound (src SVG icons); same row height as header (post-meta) */
+/* Toggles : shuffle, sound (src SVG icons); same row height as header (post-meta) */
 .sound-toggle,
 .random-toggle {
   position: relative;
@@ -713,7 +713,7 @@ html, body {
 .loading-detail { animation-delay: 0.24s; }
 .loading-progress { animation-delay: 0.3s; }
 
-/* Splash / transition loading — 2–3 slides then content */
+/* Splash / transition loading : 2–3 slides then content */
 .splash {
   position: absolute;
   inset: 0;
@@ -783,7 +783,7 @@ html, body {
 .splash-slide.splash-slide-active .splash-version { animation-delay: 0.08s; }
 .splash-slide.splash-slide-active .splash-desc { animation-delay: 0.16s; }
 
-/* Reconnect / connection issue — card layout aligned with loading */
+/* Reconnect / connection issue : card layout aligned with loading */
 @keyframes loading-enter {
   from {
     opacity: 0;

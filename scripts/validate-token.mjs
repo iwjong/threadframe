@@ -1,5 +1,5 @@
 /**
- * Pre-flight check for CI — validates token env without calling Threads API.
+ * Pre-flight check for CI: validates token env without calling Threads API.
  */
 import dotenv from "dotenv";
 import path from "path";
@@ -48,8 +48,8 @@ if (!raw && !token) {
 
 if (issue) {
   const hints = {
-    too_short: "Secret is too short — paste only the long access token, not API_SECRET or APP_ID.",
-    user_id_not_token: "Secret looks like INITIAL_USER_ID — use INITIAL_ACCESS_TOKEN instead.",
+    too_short: "Secret is too short. Paste only the long access token, not API_SECRET or APP_ID.",
+    user_id_not_token: "Secret looks like INITIAL_USER_ID. Use INITIAL_ACCESS_TOKEN instead.",
     env_line_or_wrong_value: "Paste only the token value after =, not the full .env line.",
     placeholder: "Replace placeholder with your real long-lived token.",
     missing: "Token is empty after normalization.",
