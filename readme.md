@@ -10,7 +10,7 @@
 
 ---
 
-## Why
+## Exhibit the thread, not the timeline
 
 Threads is designed as a **feed**: small cards, fast thumb movement, constant novelty. That works on a phone; it works poorly when you want a post to **hold the room**.
 
@@ -20,7 +20,7 @@ Social apps optimize engagement; Threadframe optimizes **presence** and **legibi
 
 ---
 
-## What
+## A magazine frame for one post at a time
 
 Threadframe is a **2:1 magazine layout** split into two equal voices:
 
@@ -40,7 +40,7 @@ The **concept** is not “Threads in a browser tab.” It is **your thread, fram
 
 ---
 
-## How
+## How the frame is designed to behave
 
 The design is held together by a few deliberate rules:
 
